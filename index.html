@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>線代實驗室 LA Lab — 基向量、行列式、特徵向量的互動直覺</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>線代實驗室 <span class="en">LA Lab</span></h1>
+  <p class="subtitle">用手拖出線性代數的幾何直覺 · 配合 <a href="https://www.youtube.com/@JOHNSON-MATH" target="_blank" rel="noopener">JOHNSON-MATH</a>《線性代數》EP1–EP3 服用</p>
+  <nav id="tabs"></nav>
+</header>
+
+<main>
+  <section id="panel">
+    <div id="level-head">
+      <h2 id="lv-title"></h2>
+      <a id="lv-ep" href="#" target="_blank" rel="noopener"></a>
+    </div>
+    <div id="lv-intro"></div>
+    <details id="lv-formal"><summary>正式定義(想看數學語言再展開)</summary><div id="lv-formal-body"></div></details>
+    <div id="lv-goals"></div>
+    <div id="lv-controls"></div>
+  </section>
+  <section id="stage">
+    <div id="readout"></div>
+    <canvas id="board" width="680" height="680"></canvas>
+  </section>
+</main>
+
+<footer>
+  <p>本站為原創互動視覺化,概念講解請看 <a href="https://www.youtube.com/@JOHNSON-MATH" target="_blank" rel="noopener">JOHNSON-MATH 頻道</a>。靈感亦致敬 3Blue1Brown《Essence of Linear Algebra》。</p>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

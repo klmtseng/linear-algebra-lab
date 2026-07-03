@@ -1,0 +1,134 @@
+:root {
+  --bg: #0e1220;
+  --panel: #171d31;
+  --panel2: #1d2440;
+  --ink: #e8ecf8;
+  --dim: #9aa5c4;
+  --accent: #ffd166;
+  --i-hat: #ff5c7a;
+  --j-hat: #4ade80;
+  --extra: #a78bfa;
+  --blue: #38bdf8;
+  --ok: #4ade80;
+  --line: #2a3352;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  line-height: 1.65;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); }
+h1 { font-size: 1.5rem; letter-spacing: .03em; }
+h1 .en { color: var(--accent); font-size: 1rem; margin-left: 6px; }
+.subtitle { color: var(--dim); font-size: .88rem; margin-top: 2px; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+#tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+#tabs button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .85rem;
+  font-family: inherit;
+}
+#tabs button.active { background: var(--panel2); color: var(--ink); border-color: var(--accent); }
+#tabs button.done::after { content: " ✓"; color: var(--ok); }
+
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) minmax(320px, 1fr);
+  gap: 20px;
+  padding: 20px 24px;
+  align-items: start;
+}
+#panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+#level-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+#lv-title { font-size: 1.12rem; }
+#lv-ep { font-size: .78rem; white-space: nowrap; }
+#lv-intro { margin-top: 10px; font-size: .92rem; color: var(--ink); }
+#lv-intro p + p { margin-top: 8px; }
+#lv-intro .hl { color: var(--accent); }
+#lv-intro .ih { color: var(--i-hat); font-weight: bold; }
+#lv-intro .jh { color: var(--j-hat); font-weight: bold; }
+
+details {
+  margin-top: 12px;
+  background: var(--panel2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: .86rem;
+}
+details summary { cursor: pointer; color: var(--dim); }
+details div { margin-top: 8px; color: var(--ink); }
+details .math { font-family: "STIX Two Math", "Cambria Math", serif; }
+
+#lv-goals { margin-top: 14px; }
+.goal {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel2);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-top: 6px;
+  font-size: .88rem;
+  color: var(--dim);
+}
+.goal.done { color: var(--ok); }
+.goal .box { width: 16px; text-align: center; }
+
+#lv-controls { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+#lv-controls .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#lv-controls label { font-size: .85rem; color: var(--dim); min-width: 3.2em; }
+#lv-controls input[type=range] { flex: 1; accent-color: var(--accent); }
+#lv-controls input[type=number] {
+  width: 64px; background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px;
+  font-size: .9rem; font-family: inherit;
+}
+#lv-controls button {
+  background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 12px; cursor: pointer; font-size: .86rem; font-family: inherit;
+}
+#lv-controls button:hover { border-color: var(--accent); }
+#lv-controls button.primary { background: var(--accent); color: #1a1a1a; font-weight: bold; }
+#lv-controls .val { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 3.4em; text-align: right; }
+#lv-controls .quiz-msg { font-size: .85rem; }
+.matrix-grid {
+  display: grid; grid-template-columns: auto auto; gap: 6px;
+  padding: 8px 14px; border-left: 2px solid var(--dim); border-right: 2px solid var(--dim);
+  border-radius: 6px; width: max-content;
+}
+
+#stage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+#board {
+  width: 100%; max-width: 680px;
+  background: #0a0e1a;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  touch-action: none;
+  cursor: grab;
+  display: block;
+}
+#readout {
+  font-size: .9rem; color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.6em;
+}
+#readout b { color: var(--accent); }
+
+footer { padding: 14px 24px; border-top: 1px solid var(--line); color: var(--dim); font-size: .78rem; }
+
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; }
+  #stage { order: -1; }
+}
