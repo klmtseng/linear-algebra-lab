@@ -9,8 +9,12 @@
     L6 S→R 合成矩陣 [0 -1; 1 1] 正確+quiz、L7 dot=0 正交、L8 45° 特徵方向 λ≈3
 - 已修:tab 標籤改短名、readout 移畫布上方
 
+## 2026-07-03 M1.5:公開上線
+- GitHub: https://github.com/klmtseng/linear-algebra-lab (public, noreply email)
+- Vercel: https://linear-algebra-lab-tau.vercel.app (git connect 已串,push 即自動重佈)
+- 上線驗證:index 200 含「線代實驗室」、js/main.js 200
+
 ## 待辦 / Parking lot
 - 手機實機驗收(觸控拖曳已用 pointer events + touch-action:none,理論可用)
-- 上 GitHub + Vercel(走 /gh-vercel-publish,等使用者點頭)
 - 擴充:概率 7 集系列做第二模組(骨架已可重用 tab/goal/進度系統)
 - L5 目標「det=0」會在拖曳路過原點時順手達成——若要更有儀式感可改成需停留 0.5s
