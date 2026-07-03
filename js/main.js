@@ -25,9 +25,11 @@ const fmt = (n) => (Math.abs(n) < 0.005 ? 0 : n).toFixed(2).replace(/\.00$/, "")
 /* ---------- 畫布 ---------- */
 const canvas = document.getElementById("board");
 const g = canvas.getContext("2d");
-const CX = canvas.width / 2, CY = canvas.height / 2, S = 62; // px / 單位
-const toScr = (v) => V(CX + v.x * S, CY - v.y * S);
-const fromScr = (px, py) => V((px - CX) / S, (CY - py) / S);
+const CX = canvas.width / 2, CY = canvas.height / 2;
+const cam = { scale: 62, x: 0, y: 0 }; // 世界點 (x,y) 顯示在畫布中心,scale = px/單位
+const camReset = () => { cam.scale = 62; cam.x = 0; cam.y = 0; };
+const toScr = (v) => V(CX + (v.x - cam.x) * cam.scale, CY - (v.y - cam.y) * cam.scale);
+const fromScr = (px, py) => V(cam.x + (px - CX) / cam.scale, cam.y - (py - CY) / cam.scale);
 
 const COL = {
   gridFaint: "#1a2136", grid: "#2e3a63", axis: "#55648f",
@@ -52,10 +54,11 @@ function drawGrid(m, opt = {}) {
     }
     g.stroke();
   }
-  // 變換後格線
+  // 變換後格線(示範播放時降淡,聚焦主角)
   for (let k = -N; k <= N; k++) {
     const isAxis = k === 0;
-    g.strokeStyle = isAxis ? COL.axis : COL.grid;
+    g.strokeStyle = isAxis ? (player.active ? "#39456e" : COL.axis)
+                           : (player.active ? "#212a4b" : COL.grid);
     g.lineWidth = isAxis ? 2 : 1.2;
     g.beginPath();
     let a = toScr(applyM(m, V(k, -N))), b = toScr(applyM(m, V(k, N)));
@@ -126,6 +129,7 @@ const PKEY = "lalab-progress-v1";
 let progress = {};
 try { progress = JSON.parse(localStorage.getItem(PKEY) || "{}"); } catch (e) {}
 function markGoal(id) {
+  if (player.active) return; // 示範不代打過關
   if (progress[id]) return;
   progress[id] = true;
   localStorage.setItem(PKEY, JSON.stringify(progress));
@@ -152,6 +156,7 @@ function canvasPos(ev) {
   return { x: (ev.clientX - r.left) * canvas.width / r.width, y: (ev.clientY - r.top) * canvas.height / r.height };
 }
 canvas.addEventListener("pointerdown", (ev) => {
+  if (player.active) { player.stop(); return; } // 示範中點一下 = 跳過、接手
   const p = canvasPos(ev);
   const dl = cur().draggables ? cur().draggables() : [];
   let best = null, bestD = 26;
@@ -176,6 +181,79 @@ canvas.addEventListener("pointermove", (ev) => {
 });
 window.addEventListener("pointerup", () => { dragTarget = null; });
 
+/* ---------- 示範播放器 ----------
+   步驟格式(皆可省略):{ cap 字幕, dur 毫秒,
+     vec/vec2:[get,set,目標] 向量補間, num:[get,set,目標] 數字補間,
+     cam:{scale,x,y}|"reset" 相機補間, mat:目標矩陣, call:開步時執行 } */
+const captionEl = document.getElementById("caption");
+const demoBtnEl = document.getElementById("demo-btn");
+let demoSeen = {};
+try { demoSeen = JSON.parse(localStorage.getItem("lalab-demoseen") || "{}"); } catch (e) {}
+
+const player = {
+  active: false, steps: [], idx: -1, t0: 0, dur: 0, apply: null, _hideT: 0,
+  start(steps) {
+    if (!steps || !steps.length) return;
+    this.steps = steps; this.idx = -1; this.active = true;
+    clearTimeout(this._hideT);
+    demoBtnEl.textContent = "⏭ 跳過示範";
+    this.next();
+  },
+  next() {
+    this.idx++;
+    if (this.idx >= this.steps.length) return this.stop();
+    const st = this.steps[this.idx];
+    this.dur = st.dur || 1400;
+    this.t0 = performance.now();
+    const fns = [];
+    for (const key of ["vec", "vec2"]) {
+      if (!st[key]) continue;
+      const [get, set, to] = st[key], from = { ...get() };
+      fns.push((t) => set(V(lerp(from.x, to.x, t), lerp(from.y, to.y, t))));
+    }
+    if (st.num) {
+      const [get, set, to] = st.num, from = get();
+      fns.push((t) => set(lerp(from, to, t)));
+    }
+    if (st.cam) {
+      const to = st.cam === "reset" ? { scale: 62, x: 0, y: 0 } : st.cam;
+      const from = { ...cam };
+      fns.push((t) => {
+        if (to.scale != null) cam.scale = lerp(from.scale, to.scale, t);
+        if (to.x != null) cam.x = lerp(from.x, to.x, t);
+        if (to.y != null) cam.y = lerp(from.y, to.y, t);
+      });
+    }
+    if (st.mat) animateTo(st.mat, this.dur);
+    if (st.call) st.call();
+    this.apply = fns.length ? (t) => fns.forEach((f) => f(t)) : null;
+    if (st.cap != null) { captionEl.textContent = st.cap; captionEl.classList.add("show"); }
+  },
+  update() {
+    if (!this.active) return;
+    const t = Math.min(1, (performance.now() - this.t0) / this.dur);
+    this.apply && this.apply(ease(t));
+    cur()._sync && cur()._sync();
+    if (t >= 1) this.next();
+  },
+  cancel() {
+    this.active = false; this.apply = null;
+    clearTimeout(this._hideT);
+    captionEl.classList.remove("show");
+    demoBtnEl.textContent = "▶ 看示範";
+    camReset();
+  },
+  stop() { // 示範結束/跳過:回到起始狀態,交還控制
+    this.cancel();
+    const lv = cur();
+    lv.enter && lv.enter();
+    lv._sync && lv._sync();
+    captionEl.textContent = "換你操作了 👆 完成任務清單";
+    captionEl.classList.add("show");
+    this._hideT = setTimeout(() => captionEl.classList.remove("show"), 2800);
+  },
+};
+
 /* ---------- 關卡定義 ---------- */
 const EP = {
   1: ["EP1 基向量與張成空間 ▶", "https://www.youtube.com/watch?v=ZvDpkXAvWGk"],
@@ -194,6 +272,13 @@ const levels = [
   goals: [{ id: "L1-hit", text: "把 v 調成 3·î + 2·ĵ(拖到 (3,2))" }],
   state: { v: V(1.5, 1) },
   enter() { this.state.v = V(1.5, 1); setMatrixNow(MI()); },
+  demo() { const s = this.state; return [
+    { cap: "這根黃色箭頭 v,目前的配方:1.5 份 î + 1 份 ĵ", dur: 2400 },
+    { cam: { scale: 95, x: 1.6, y: 1 }, cap: "虛線就是配方:先沿紅色 î 走,再沿綠色 ĵ 走", dur: 2200 },
+    { vec: [() => s.v, (w) => s.v = w, V(3, 2)], cap: "現在把 v 拖去 (3, 2)……", dur: 2000 },
+    { cap: "配方變成 3 份 î + 2 份 ĵ——座標就是配方", dur: 2200 },
+    { cam: "reset", vec: [() => s.v, (w) => s.v = w, V(1.5, 1)], cap: "換你親手拖一次!", dur: 1400 },
+  ]; },
   draggables() { const s = this.state; return [{ get: () => s.v, set: (w) => { s.v = w; } }]; },
   draw() {
     const v = this.state.v;
@@ -217,6 +302,13 @@ const levels = [
   goals: [{ id: "L2-hit", text: "讓 p = 2î + ĵ 降落在星星 (1,3) 上" }],
   state: { i: V(1, 0), j: V(0, 1) },
   enter() { this.state.i = V(1, 0); this.state.j = V(0, 1); },
+  demo() { const s = this.state; return [
+    { cap: "黃點 p 的配方鎖死:2 份 î + 1 份 ĵ", dur: 2200 },
+    { vec: [() => s.i, (w) => s.i = w, V(1, 0.5)], cap: "搬動 î——整片格線跟著變形", dur: 2000 },
+    { vec: [() => s.j, (w) => s.j = w, V(-0.5, 1)], cap: "搬動 ĵ——p 被格線載著走", dur: 2000 },
+    { cam: { scale: 95, x: 1.5, y: 2 }, cap: "p 永遠停在「2 格新 î + 1 格新 ĵ」的交會點", dur: 2400 },
+    { cam: "reset", cap: "你的任務:把 p 載到星星上", dur: 1600 },
+  ]; },
   draggables() {
     const s = this.state;
     return [{ get: () => s.i, set: (w) => { s.i = w; } }, { get: () => s.j, set: (w) => { s.j = w; } }];
@@ -246,6 +338,14 @@ const levels = [
   ],
   state: { v: V(2, 1), w: V(-1, 1), a: 1, b: 1 },
   enter() { Object.assign(this.state, { v: V(2, 1), w: V(-1, 1), a: 1, b: 1 }); },
+  demo() { const s = this.state; return [
+    { cap: "淡黃色區域:v 和 w 一切組合能踩到的地盤", dur: 2400 },
+    { num: [() => s.a, (x) => { s.a = x; }, 2], cap: "調 a——沿 v 方向走 2 份", dur: 1600 },
+    { num: [() => s.b, (x) => { s.b = x; }, 1.5], cap: "調 b——再沿 w 走 1.5 份,白點就是組合結果", dur: 1800 },
+    { vec: [() => s.w, (w) => s.w = w, V(1, 0.5)], cap: "現在把 w 拖到跟 v 同一條線上……", dur: 2200 },
+    { cap: "整個地盤塌成一條線!這就是「線性相依」", dur: 2400 },
+    { vec: [() => s.w, (w) => s.w = w, V(-1, 1)], cap: "換你:先命中星星,再親手塌一次", dur: 1600 },
+  ]; },
   controls(el) {
     const s = this.state;
     el.innerHTML = `
@@ -253,6 +353,10 @@ const levels = [
       <div class="row"><label>b</label><input type="range" id="sb" min="-3" max="3" step="0.05" value="1"><span class="val" id="vb">1</span></div>`;
     el.querySelector("#sa").oninput = (e) => { s.a = +e.target.value; el.querySelector("#va").textContent = fmt(s.a); };
     el.querySelector("#sb").oninput = (e) => { s.b = +e.target.value; el.querySelector("#vb").textContent = fmt(s.b); };
+    this._sync = () => { // 示範補間時讓滑桿跟著動
+      el.querySelector("#sa").value = s.a; el.querySelector("#va").textContent = fmt(s.a);
+      el.querySelector("#sb").value = s.b; el.querySelector("#vb").textContent = fmt(s.b);
+    };
   },
   draggables() {
     const s = this.state;
@@ -294,6 +398,15 @@ const levels = [
   goals: [{ id: "L4-all", text: "四種預設變換(旋轉/剪切/縮放/鏡射)都試過一遍" }],
   state: { tried: {} },
   enter() { this.state.tried = {}; setMatrixNow(MI()); },
+  demo() { return [
+    { cap: "矩陣 = 變形指令:兩個 column 就是 î、ĵ 的新家", dur: 2400 },
+    { mat: M(V(0, 1), V(-1, 0)), cap: "旋轉 90°:î → (0,1),ĵ → (−1,0)", dur: 1800 },
+    { dur: 900 },
+    { mat: MI(), dur: 900 },
+    { mat: M(V(1, 0), V(1, 1)), cap: "剪切:î 不動,只推歪 ĵ——看 F 被掰", dur: 1800 },
+    { cam: { scale: 100, x: 1.2, y: 1.5 }, cap: "拉近看:格線仍平行等距,這就是「線性」", dur: 2200 },
+    { cam: "reset", mat: MI(), cap: "四個預設按鈕都按按看", dur: 1400 },
+  ]; },
   controls(el) {
     const s = this.state;
     el.innerHTML = `
@@ -351,6 +464,13 @@ const levels = [
   ],
   state: { i: V(1, 0), j: V(0, 1) },
   enter() { this.state.i = V(1, 0); this.state.j = V(0, 1); },
+  demo() { const s = this.state; return [
+    { cap: "藍色方格 = 單位方格被變換後的樣子,面積 = det", dur: 2400 },
+    { vec: [() => s.i, (w) => s.i = w, V(2, 0)], cap: "î 拉長兩倍:面積 ×2,det = 2", dur: 2000 },
+    { vec: [() => s.j, (w) => s.j = w, V(1, 0)], cap: "把 ĵ 壓向 î……空間塌進一條線,det = 0", dur: 2400 },
+    { vec: [() => s.j, (w) => s.j = w, V(0, -1)], cap: "ĵ 翻到下面:方格翻面變橘,det < 0", dur: 2200 },
+    { vec: [() => s.i, (w) => s.i = w, V(1, 0)], vec2: [() => s.j, (w) => s.j = w, V(0, 1)], cap: "換你做出 det = 0 和 det < 0!", dur: 1400 },
+  ]; },
   draggables() {
     const s = this.state;
     return [{ get: () => s.i, set: (w) => { s.i = w; } }, { get: () => s.j, set: (w) => { s.j = w; } }];
@@ -378,6 +498,22 @@ const levels = [
   ],
   state: { cur: MI(), seq: [], orders: {} },
   enter() { this.state.cur = MI(); this.state.seq = []; this.state.orders = {}; setMatrixNow(MI()); },
+  demo() {
+    const s = this.state;
+    const SH = M(V(1, 0), V(1, 1)), RO = M(V(0, 1), V(-1, 0));
+    const set = (seq, m) => () => { s.seq = seq; s.cur = m; };
+    return [
+      { mat: MI(), call: set([], MI()), cap: "接力實驗:先「剪切 S」再「旋轉 R」", dur: 1600 },
+      { mat: SH, call: set(["S"], SH), cap: "第一棒:剪切 S", dur: 1600 },
+      { mat: mulM(RO, SH), call: set(["S", "R"], mulM(RO, SH)), cap: "第二棒:旋轉 R——合成矩陣 = R·S", dur: 2000 },
+      { dur: 1200 },
+      { mat: MI(), call: set([], MI()), cap: "重來,順序對調:先旋轉、再剪切", dur: 1200 },
+      { mat: RO, call: set(["R"], RO), cap: "第一棒:旋轉 R", dur: 1600 },
+      { mat: mulM(SH, RO), call: set(["R", "S"], mulM(SH, RO)), cap: "第二棒:剪切 S——合成 = S·R,長得不一樣!", dur: 2200 },
+      { dur: 1200 },
+      { mat: MI(), call: set([], MI()), cap: "順序不同、結果不同:AB ≠ BA。換你接力+答題", dur: 1600 },
+    ];
+  },
   controls(el) {
     const s = this.state;
     const SH = M(V(1, 0), V(1, 1)), RO = M(V(0, 1), V(-1, 0));
@@ -428,6 +564,13 @@ const levels = [
   goals: [{ id: "L7-perp", text: "把內積調到 0(兩向量垂直,長度都 > 1)" }],
   state: { u: V(3, 1), w: V(1, 2) },
   enter() { this.state.u = V(3, 1); this.state.w = V(1, 2); },
+  demo() { const s = this.state; return [
+    { cap: "藍色粗線 = u 在 w 方向上的影子(投影)", dur: 2400 },
+    { vec: [() => s.u, (w) => s.u = w, V(-1, 3)], cap: "轉動 u……影子越縮越短,內積跟著變小", dur: 2600 },
+    { vec: [() => s.u, (w) => s.u = w, V(-2, 1)], cap: "影子縮到 0:內積 = 0,u ⊥ w", dur: 2000 },
+    { dur: 1600 },
+    { vec: [() => s.u, (w) => s.u = w, V(3, 1)], cap: "換你親手做出一次垂直!", dur: 1600 },
+  ]; },
   draggables() {
     const s = this.state;
     return [{ get: () => s.u, set: (w) => { s.u = w; } }, { get: () => s.w, set: (w) => { s.w = w; } }];
@@ -468,6 +611,14 @@ const levels = [
   ],
   state: { u: V(2, 1.4), A: M(V(2, 0), V(1, 3)) },
   enter() { this.state.u = V(2, 1.4); setMatrixNow(this.state.A); },
+  demo() { const s = this.state; return [
+    { cap: "紫色箭頭 = u 被矩陣 A 打過去的結果 A·u", dur: 2400 },
+    { vec: [() => s.u, (w) => s.u = w, V(0.5, 2)], cap: "隨便一個方向:一打就轉向", dur: 2000 },
+    { vec: [() => s.u, (w) => s.u = w, V(-1.5, 1.5)], cap: "再換一個……還是轉向", dur: 2000 },
+    { vec: [() => s.u, (w) => s.u = w, V(2, 2)], cap: "但這個方向——", dur: 1800 },
+    { cap: "不轉向!只被拉長 3 倍:特徵向量,λ = 3", dur: 2600 },
+    { vec: [() => s.u, (w) => s.u = w, V(2, 1.4)], cap: "另一條特徵方向藏在別處,換你獵!", dur: 1600 },
+  ]; },
   draggables() { const s = this.state; return [{ get: () => s.u, set: (w) => { s.u = w; } }]; },
   draw() {
     const s = this.state;
@@ -528,6 +679,7 @@ function renderGoals() {
 }
 
 function switchLevel(k) {
+  player.cancel();
   curIdx = k;
   const lv = cur();
   document.getElementById("lv-title").textContent = lv.title;
@@ -538,12 +690,25 @@ function switchLevel(k) {
   document.getElementById("lv-formal").open = false;
   const ctl = document.getElementById("lv-controls");
   ctl.innerHTML = "";
+  lv._sync = null;
   lv.enter && lv.enter();
   lv.controls && lv.controls(ctl);
   renderGoals(); renderTabs();
+  // 第一次進入且尚未通關 → 自動播示範
+  if (lv.demo && !demoSeen[lv.id] && !levelDone(lv)) {
+    demoSeen[lv.id] = true;
+    localStorage.setItem("lalab-demoseen", JSON.stringify(demoSeen));
+    player.start(lv.demo());
+  }
 }
 
+demoBtnEl.onclick = () => {
+  if (player.active) player.stop();
+  else if (cur().demo) player.start(cur().demo());
+};
+
 function frame() {
+  player.update();
   clear();
   cur().draw();
   requestAnimationFrame(frame);
