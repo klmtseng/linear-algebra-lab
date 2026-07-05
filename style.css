@@ -21,8 +21,39 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background .25s, color .25s;
 }
-header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); }
+/* 淺色課程主題 */
+body.light {
+  --bg: #f4f6fc;
+  --panel: #ffffff;
+  --panel2: #eef1f8;
+  --ink: #1b2138;
+  --dim: #5c688a;
+  --line: #d8deec;
+}
+body.light #board { background: #f4f6fc; }
+body.light #caption, body.light #cert { background: rgba(255,255,255,.94); }
+header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); position: relative; }
+#theme-btn {
+  position: absolute; top: 18px; right: 22px;
+  background: var(--panel2); border: 1px solid var(--line); color: var(--ink);
+  width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 1.1rem;
+}
+#theme-btn:hover { border-color: var(--accent); }
+#overall { color: var(--accent); margin-left: 12px; font-variant-numeric: tabular-nums; }
+#cert {
+  display: none;
+  background: linear-gradient(135deg, rgba(255,209,102,.18), rgba(167,139,250,.14));
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: .92rem;
+}
+#cert.show { display: block; }
+#cert .big { font-size: 1.08rem; font-weight: bold; color: var(--accent); }
+#cert .sub { color: var(--dim); font-size: .82rem; margin-top: 3px; }
 h1 { font-size: 1.5rem; letter-spacing: .03em; }
 h1 .en { color: var(--accent); font-size: 1rem; margin-left: 6px; }
 .subtitle { color: var(--dim); font-size: .88rem; margin-top: 2px; }

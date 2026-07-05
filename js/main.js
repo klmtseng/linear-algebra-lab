@@ -39,12 +39,27 @@ const COL = {
   span: "rgba(255,209,102,.10)", gold: "#fbbf24",
 };
 
-function clear() { g.clearRect(0, 0, canvas.width, canvas.height); }
+// 主題:只切換「背景/格線/文字」這些會在淺底失效的顏色;彩色箭頭兩色皆可讀
+const THEMES = {
+  dark:  { bg: "#0a0e1a", grid: "#2e3a63", gridFaint: "#1a2136", axis: "#55648f", text: "#e8ecf8", dim: "#9aa5c4", demoGrid: "#212a4b", demoAxis: "#39456e", panel: "#0f1424" },
+  light: { bg: "#f4f6fc", grid: "#c4cee6", gridFaint: "#e3e8f3", axis: "#8b98ba", text: "#1b2138", dim: "#5c688a", demoGrid: "#dfe5f2", demoAxis: "#b8c2dc", panel: "#eaeef8" },
+};
+let themeName = localStorage.getItem("lalab-theme") || "dark";
+let TH = THEMES[themeName];
+function applyTheme(name) {
+  themeName = name; TH = THEMES[name];
+  localStorage.setItem("lalab-theme", name);
+  document.body.classList.toggle("light", name === "light");
+  // 同步機率模組調色盤的「文字/座標軸」到主題(彩色資料色不動)
+  if (typeof PC !== "undefined") { PC.ink = TH.text; PC.dim = TH.dim; PC.axis = TH.axis; PC.grid = TH.gridFaint; }
+}
+
+function clear() { g.fillStyle = TH.bg; g.fillRect(0, 0, canvas.width, canvas.height); }
 
 function drawGrid(m, opt = {}) {
   const N = 9;
   if (opt.original !== false) { // 原始格線(淡)
-    g.strokeStyle = COL.gridFaint; g.lineWidth = 1;
+    g.strokeStyle = TH.gridFaint; g.lineWidth = 1;
     g.beginPath();
     for (let k = -N; k <= N; k++) {
       let a = toScr(V(k, -N)), b = toScr(V(k, N));
@@ -57,8 +72,8 @@ function drawGrid(m, opt = {}) {
   // 變換後格線(示範播放時降淡,聚焦主角)
   for (let k = -N; k <= N; k++) {
     const isAxis = k === 0;
-    g.strokeStyle = isAxis ? (player.active ? "#39456e" : COL.axis)
-                           : (player.active ? "#212a4b" : COL.grid);
+    g.strokeStyle = isAxis ? (player.active ? TH.demoAxis : TH.axis)
+                           : (player.active ? TH.demoGrid : TH.grid);
     g.lineWidth = isAxis ? 2 : 1.2;
     g.beginPath();
     let a = toScr(applyM(m, V(k, -N))), b = toScr(applyM(m, V(k, N)));
@@ -133,7 +148,7 @@ function markGoal(id) {
   if (progress[id]) return;
   progress[id] = true;
   localStorage.setItem(PKEY, JSON.stringify(progress));
-  renderGoals(); renderTabs();
+  renderGoals(); renderTabs(); renderSubjects(); renderOverall(); updateCert();
 }
 
 /* ---------- 矩陣動畫 ---------- */
@@ -275,6 +290,11 @@ const EP = {
   P7: ["統計推論 中心極限定理 ▶", "https://www.youtube.com/watch?v=Zz_2gT2RHKU"],
   P8: ["概率EP01 機率的本質 ▶", "https://www.youtube.com/watch?v=DKx6p4__gkQ"],
   P9: ["概率EP06 條件機率 ▶", "https://www.youtube.com/watch?v=tFUBBCfnjs8"],
+  // 微積分系列
+  C1: ["微積分EP1 極限與夾擠 ▶", "https://www.youtube.com/watch?v=hjEMERJlhXQ"],
+  C2: ["微積分EP2 微分:瞬間斜率 ▶", "https://www.youtube.com/watch?v=VIVYtZPUGGM"],
+  C3: ["微積分EP2 積分:總帳面積 ▶", "https://www.youtube.com/watch?v=VIVYtZPUGGM"],
+  C4: ["微積分EP3 基本定理 ▶", "https://www.youtube.com/watch?v=vqzEcFxNN_U"],
 };
 const readout = document.getElementById("readout");
 
@@ -1010,6 +1030,36 @@ function drawDisc(cx, cy, r, fill, stroke, lw = 2) {
   if (fill) { g.fillStyle = fill; g.fill(); }
   if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); }
 }
+// 函數繪圖:任意 box、x/y 範圍
+function plotMap(xmin, xmax, ymin, ymax, box) {
+  const B = box || PLOT;
+  return {
+    X: (x) => B.x0 + (x - xmin) / (xmax - xmin) * (B.x1 - B.x0),
+    Y: (y) => B.y1 - (y - ymin) / (ymax - ymin) * (B.y1 - B.y0),
+    invX: (px) => xmin + (px - B.x0) / (B.x1 - B.x0) * (xmax - xmin),
+    xmin, xmax, ymin, ymax, B,
+  };
+}
+function plotAxes(m, xlabel) {
+  const B = m.B;
+  g.strokeStyle = TH.grid; g.lineWidth = 1;
+  g.strokeRect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0);
+  g.strokeStyle = TH.axis; g.lineWidth = 1.5;
+  if (m.ymin < 0 && m.ymax > 0) { const y0 = m.Y(0); g.beginPath(); g.moveTo(B.x0, y0); g.lineTo(B.x1, y0); g.stroke(); }
+  if (m.xmin < 0 && m.xmax > 0) { const x0 = m.X(0); g.beginPath(); g.moveTo(x0, B.y0); g.lineTo(x0, B.y1); g.stroke(); }
+  if (xlabel) pText((B.x0 + B.x1) / 2, B.y1 + 22, xlabel, TH.dim, 13, "center");
+}
+function plotFn(m, f, color, lw = 2.5) {
+  g.strokeStyle = color; g.lineWidth = lw; g.beginPath();
+  let pen = false;
+  for (let px = m.B.x0; px <= m.B.x1; px += 1.5) {
+    const y = f(m.invX(px));
+    if (!isFinite(y) || y < m.ymin - 1 || y > m.ymax + 1) { pen = false; continue; }
+    const py = m.Y(y);
+    pen ? g.lineTo(px, py) : g.moveTo(px, py); pen = true;
+  }
+  g.stroke();
+}
 
 const PROB_LEVELS = [
 
@@ -1528,10 +1578,237 @@ const PROB_LEVELS = [
 },
 ];
 
+/* ═══════════════════════════════════════════════════════════
+   微積分模組 — 函數繪圖(螢幕座標)
+   ═══════════════════════════════════════════════════════════ */
+const CALC_LEVELS = [
+
+/* ─── C1:極限與夾擠 ─── */
+{
+  id: "C1", short: "極限夾擠", title: "關 1|極限:算不出來,就用兩邊「夾」", ep: "C1", subj: "calc",
+  intro: `<p>函數 <b>sin(x)/x</b> 在 x = 0 是 0/0——直接代<b>算不出來</b>,那裡是個「洞」。但它附近的值明明趨近某個數。怎麼確定?用<b>夾擠</b>:找兩條會合的函數把它夾住。</p><p>這裡 <b>cos(x) ≤ sin(x)/x ≤ 1</b>。拖滑桿讓探針 x → 0,看上下界都逼近 <b>1</b>,中間的它<b>逃不掉</b>,極限就是 1。再把探針拖到正中央 x = 0,確認函數在該點<b>沒有定義</b>(洞),但極限存在。</p>`,
+  formal: `<p class="math">夾擠定理:若 g(x) ≤ f(x) ≤ h(x) 且 lim g = lim h = L,則 lim f = L。由 cos x ≤ sin x / x ≤ 1 且 cos x → 1,得 lim_{x→0} sin x / x = 1。函數在 0 未定義不影響極限。</p>`,
+  goals: [
+    { id: "C1-near", text: "把探針拖到 |x| < 0.15,看三線都夾到 1" },
+    { id: "C1-hole", text: "把探針移到 x = 0,發現函數在該點是「洞」" },
+  ],
+  state: { x0: 2.2 },
+  f: (x) => Math.abs(x) < 1e-9 ? NaN : Math.sin(x) / x,
+  enter() { this.state.x0 = 2.2; },
+  map() { return plotMap(-Math.PI, Math.PI, -0.4, 1.25); },
+  demo() { const s = this.state; return [
+    { cap: "藍線 sin(x)/x,上界 1、下界 cos(x) 把它夾在中間", dur: 2600 },
+    { num: [() => s.x0, (v) => s.x0 = v, 0.1], cap: "探針 x → 0:上下界一起收斂到 1", dur: 2600 },
+    { cap: "中間的 sin(x)/x 被夾住,極限 = 1", dur: 2200 },
+    { num: [() => s.x0, (v) => s.x0 = v, 0], cap: "但 x = 0 本身是個洞:函數沒定義", dur: 2400 },
+    { num: [() => s.x0, (v) => s.x0 = v, 2.2], cap: "換你:拖近 0 看夾擠,再停在 0 看洞", dur: 1600 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `<div class="row"><label>探針 x</label><input type="range" id="cx" min="-3.14" max="3.14" step="0.01" value="2.2"><span class="val" id="vcx">2.2</span></div>`;
+    el.querySelector("#cx").oninput = (e) => { s.x0 = +e.target.value; el.querySelector("#vcx").textContent = fmt(s.x0); };
+    this._sync = () => { el.querySelector("#cx").value = s.x0; el.querySelector("#vcx").textContent = fmt(s.x0); };
+  },
+  draw() {
+    const s = this.state, m = this.map();
+    plotAxes(m, "x");
+    plotFn(m, (x) => Math.cos(x), "#4ade80", 2);          // 下界
+    plotFn(m, () => 1, "#38bdf8", 2);                      // 上界
+    plotFn(m, this.f, "#ffd166", 3);                       // sin(x)/x
+    pText(m.X(2.2), m.Y(Math.cos(2.2)) + 18, "cos x", "#4ade80", 12, "center");
+    pText(m.B.x0 + 40, m.Y(1) - 8, "y = 1", "#38bdf8", 12);
+    // 洞 at x=0
+    drawDisc(m.X(0), m.Y(1), 5, TH.bg, "#ffd166", 2);
+    // 探針
+    const px = m.X(s.x0), fv = this.f(s.x0);
+    g.strokeStyle = PC.post; g.lineWidth = 2; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(px, m.B.y0); g.lineTo(px, m.B.y1); g.stroke(); g.setLineDash([]);
+    if (isFinite(fv)) drawDisc(px, m.Y(fv), 6, PC.post, null);
+    const near = Math.abs(s.x0) < 0.15;
+    readout.innerHTML = Math.abs(s.x0) < 1e-6
+      ? `x = 0:sin(x)/x = 0/0 <b style="color:#ffd166">未定義(洞)</b>,但極限 = 1`
+      : `x = ${fmt(s.x0)}　cos x = ${fmt(Math.cos(s.x0))} ≤ <b>sin x/x = ${fmt(fv)}</b> ≤ 1${near ? "　<b style='color:#4ade80'>夾到 1!</b>" : ""}`;
+    if (near) markGoal("C1-near");
+    if (Math.abs(s.x0) < 1e-6) markGoal("C1-hole");
+  },
+},
+
+/* ─── C2:導數 = 割線趨近切線 ─── */
+{
+  id: "C2", short: "導數斜率", title: "關 2|導數:割線縮成切線,斜率就是瞬間變化", ep: "C2", subj: "calc",
+  intro: `<p>平均變化率是<b>割線</b>的斜率:取 x 和 x+h 兩點連線。把間距 <b>h 縮到 0</b>,割線就轉成<b>切線</b>,它的斜率就是<b>導數 f′(x)</b>——那一瞬間的變化率。</p><p>拖 x 選位置,調滑桿讓 h → 0,看割線(紫)貼合切線、斜率讀數趨近 f′(x)。再把 x 移到曲線的<b>山頂或谷底</b>,那裡斜率 = 0。</p>`,
+  formal: `<p class="math">f′(x) = lim_{h→0} [f(x+h) − f(x)] / h。此處 f(x) = 0.15x³ − 0.6x,f′(x) = 0.45x² − 0.6,零點 x = ±√(4/3) ≈ ±1.15(極值處切線水平)。</p>`,
+  goals: [
+    { id: "C2-shrink", text: "把 h 調到 < 0.15,割線幾乎變成切線" },
+    { id: "C2-flat", text: "把 x 移到極值處,讓切線斜率 ≈ 0" },
+  ],
+  state: { px: -2, h: 1.4 },
+  f: (x) => 0.15 * x ** 3 - 0.6 * x,
+  df: (x) => 0.45 * x * x - 0.6,
+  enter() { this.state.px = -2; this.state.h = 1.4; },
+  map() { return plotMap(-3, 3, -1.8, 1.8); },
+  demo() { const s = this.state; return [
+    { cap: "紫色是割線:連 x 與 x+h 兩點", dur: 2200 },
+    { num: [() => s.h, (v) => s.h = v, 0.08], cap: "h → 0:割線轉成切線,斜率 → 導數", dur: 2600 },
+    { num: [() => s.px, (v) => s.px = v, -1.15], cap: "移到山頂:切線水平,斜率 = 0", dur: 2400 },
+    { num: [() => s.px, (v) => s.px = v, 1.15], cap: "移到谷底:斜率也是 0", dur: 2200 },
+    { num: [() => s.px, (v) => s.px = v, -2], num2: [() => s.h, (v) => s.h = v, 1.4], cap: "換你:縮 h 成切線,再找斜率=0 的點", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state, m = this.map();
+    return [{
+      getScreen: () => ({ x: m.X(s.px), y: m.B.y1 - 6 }), // x 軸上的握把,好抓
+      setScreen: (px) => { s.px = Math.max(-2.8, Math.min(2.8, m.invX(px))); },
+    }];
+  },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `<div class="row"><label>間距 h</label><input type="range" id="ch" min="0.02" max="2" step="0.02" value="1.4"><span class="val" id="vch">1.4</span></div>
+      <div class="row" style="font-size:.82rem;color:var(--dim)">拖 x 軸上的 ▲ 握把移動 x</div>`;
+    el.querySelector("#ch").oninput = (e) => { s.h = +e.target.value; el.querySelector("#vch").textContent = fmt(s.h); };
+    this._sync = () => { el.querySelector("#ch").value = s.h; el.querySelector("#vch").textContent = fmt(s.h); };
+  },
+  draw() {
+    const s = this.state, m = this.map(), f = this.f;
+    plotAxes(m, "x");
+    plotFn(m, f, "#ffd166", 3);
+    const x1 = s.px, x2 = s.px + s.h, y1 = f(x1), y2 = f(x2);
+    const sec = (y2 - y1) / s.h;
+    // 割線(延伸)
+    g.strokeStyle = PC.post; g.lineWidth = 2.5; g.beginPath();
+    g.moveTo(m.B.x0, m.Y(y1 + sec * (m.invX(m.B.x0) - x1)));
+    g.lineTo(m.B.x1, m.Y(y1 + sec * (m.invX(m.B.x1) - x1))); g.stroke();
+    drawDisc(m.X(x1), m.Y(y1), 6, "#ffd166", null);
+    drawDisc(m.X(x2), m.Y(y2), 5, PC.post, null);
+    // x 軸握把
+    const hx = m.X(x1);
+    g.fillStyle = "#ffd166"; g.beginPath();
+    g.moveTo(hx, m.B.y1 - 12); g.lineTo(hx - 8, m.B.y1 + 2); g.lineTo(hx + 8, m.B.y1 + 2); g.closePath(); g.fill();
+    const der = this.df(x1);
+    readout.innerHTML = `割線斜率 = <b>${fmt(sec)}</b>　→　導數 f′(${fmt(x1)}) = <b>${fmt(der)}</b>${Math.abs(der) < 0.06 ? "　<b style='color:#4ade80'>切線水平!</b>" : ""}`;
+    if (s.h < 0.15) markGoal("C2-shrink");
+    if (Math.abs(der) < 0.06) markGoal("C2-flat");
+  },
+},
+
+/* ─── C3:積分 = 黎曼和逼近面積 ─── */
+{
+  id: "C3", short: "積分面積", title: "關 3|積分:用長方形一格格逼近面積", ep: "C3", subj: "calc",
+  intro: `<p>曲線下的<b>面積</b>怎麼算?先用<b>長方形</b>把它切成一格格加起來(黎曼和)。格子少時很粗糙,誤差大;把格子<b>切得越細</b>,長方形總面積就越貼近真正的面積——那個極限就是<b>定積分</b>。</p><p>拖滑桿加格數 N,看藍色長方形逐漸填滿曲線下方,黎曼和逼近真實值。</p>`,
+  formal: `<p class="math">∫ₐᵇ f(x)dx = lim_{N→∞} Σ f(xᵢ*)·Δx,Δx = (b−a)/N。長方形和隨 N→∞ 收斂到曲線下有向面積。此為積分的定義。</p>`,
+  goals: [
+    { id: "C3-coarse", text: "把 N 調到 ≤ 4,看粗糙長方形的明顯誤差" },
+    { id: "C3-fine", text: "把 N 調到 ≥ 40,黎曼和逼近真實面積" },
+  ],
+  state: { N: 4 },
+  f: (x) => 1.4 * Math.exp(-((x - 1.5) ** 2) / 1.3) + 0.3,
+  enter() { this.state.N = 4; },
+  map() { return plotMap(0, 3, 0, 2, { x0: 80, y0: 80, x1: 600, y1: 540 }); },
+  exact() { return integ(this.f, 0, 3); },
+  riemann(N) { let s = 0; const h = 3 / N; for (let k = 0; k < N; k++) s += this.f((k + 0.5) * h) * h; return s; },
+  demo() { const s = this.state; return [
+    { num: [() => s.N, (v) => s.N = Math.round(v), 3], cap: "只有 3 格:長方形和曲線差很多", dur: 2400 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 10], cap: "10 格:誤差變小", dur: 2000 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 60], cap: "60 格:幾乎填滿,黎曼和 ≈ 真實面積", dur: 2600 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 4], cap: "換你:從粗到細,看和收斂", dur: 1600 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `<div class="row"><label>格數 N</label><input type="range" id="cn" min="1" max="80" step="1" value="4"><span class="val" id="vcn">4</span></div>`;
+    el.querySelector("#cn").oninput = (e) => { s.N = +e.target.value; el.querySelector("#vcn").textContent = s.N; };
+    this._sync = () => { el.querySelector("#cn").value = s.N; el.querySelector("#vcn").textContent = s.N; };
+  },
+  draw() {
+    const N = Math.max(1, Math.round(this.state.N)), m = this.map(), f = this.f, h = 3 / N;
+    // 長方形
+    for (let k = 0; k < N; k++) {
+      const xm = (k + 0.5) * h, yv = f(xm);
+      const xL = m.X(k * h), xR = m.X((k + 1) * h), yT = m.Y(yv), yB = m.Y(0);
+      g.fillStyle = "rgba(56,189,248,.30)"; g.fillRect(xL, yT, xR - xL, yB - yT);
+      g.strokeStyle = PC.prior; g.lineWidth = 1; g.strokeRect(xL, yT, xR - xL, yB - yT);
+    }
+    plotAxes(m, "x");
+    plotFn(m, f, "#ffd166", 3);
+    const approx = this.riemann(N), exact = this.exact();
+    readout.innerHTML = `N = <b>${N}</b>　黎曼和 = <b>${approx.toFixed(3)}</b>　真實面積 ≈ ${exact.toFixed(3)}　誤差 ${Math.abs(approx - exact).toFixed(3)}`;
+    if (N <= 4) markGoal("C3-coarse");
+    if (N >= 40) markGoal("C3-fine");
+  },
+},
+
+/* ─── C4:微積分基本定理 ─── */
+{
+  id: "C4", short: "基本定理", title: "關 4|基本定理:面積的變化率,就是原函數", ep: "C4", subj: "calc",
+  intro: `<p>把「從 0 累積到 x 的面積」看成一個新函數 <b>A(x)</b>(下圖)。微積分基本定理說:<b>A′(x) = f(x)</b>——面積函數的<b>斜率</b>,剛好等於上圖曲線在該處的<b>高度</b>。微分和積分,是同一件事的兩面。</p><p>拖動 x。f 高的地方(上圖),A 爬得陡(下圖);f 碰到 <b>0</b> 的地方,A 暫時<b>走平</b>(斜率 0)。</p>`,
+  formal: `<p class="math">微積分基本定理:若 A(x) = ∫ₐˣ f(t)dt,則 A′(x) = f(x)。故 ∫ₐᵇ f = A(b) − A(a)。累積量的瞬間變化率 = 被積函數本身。</p>`,
+  goals: [
+    { id: "C4-peak", text: "把 x 移到 f 最高處,看 A 爬得最陡" },
+    { id: "C4-zero", text: "把 x 移到 f = 0 處,看 A 暫時走平" },
+  ],
+  state: { x0: 1.2 },
+  f: (x) => 1 + Math.sin(x),
+  A: (x) => x + 1 - Math.cos(x),       // ∫₀ˣ(1+sin) = x + 1 − cos x
+  enter() { this.state.x0 = 1.2; },
+  mTop() { return plotMap(0, 2 * Math.PI, 0, 2.2, { x0: 80, y0: 60, x1: 600, y1: 300 }); },
+  mBot() { return plotMap(0, 2 * Math.PI, 0, 8, { x0: 80, y0: 350, x1: 600, y1: 590 }); },
+  demo() { const s = this.state; return [
+    { cap: "上圖 f(x)=1+sin x,下圖 A(x)=從 0 累積的面積", dur: 2600 },
+    { num: [() => s.x0, (v) => s.x0 = v, Math.PI / 2], cap: "x 到 f 的最高點:A 在這裡爬得最陡", dur: 2600 },
+    { num: [() => s.x0, (v) => s.x0 = v, 3 * Math.PI / 2], cap: "x 到 f = 0 處:A 的斜率變 0,暫時走平", dur: 2600 },
+    { num: [() => s.x0, (v) => s.x0 = v, 1.2], cap: "A′(x) = f(x)。換你拖拖看", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state, m = this.mTop();
+    return [{
+      getScreen: () => ({ x: m.X(s.x0), y: m.B.y1 - 6 }), // 頂圖 x 軸握把
+      setScreen: (px) => { s.x0 = Math.max(0, Math.min(2 * Math.PI, m.invX(px))); },
+    }];
+  },
+  draw() {
+    const s = this.state, mt = this.mTop(), mb = this.mBot(), f = this.f, A = this.A;
+    // 上:f + 到 x 的陰影面積
+    g.fillStyle = "rgba(255,209,102,.22)"; g.beginPath();
+    g.moveTo(mt.X(0), mt.Y(0));
+    for (let px = mt.B.x0; px <= mt.X(s.x0); px += 2) g.lineTo(px, mt.Y(f(mt.invX(px))));
+    g.lineTo(mt.X(s.x0), mt.Y(0)); g.closePath(); g.fill();
+    plotAxes(mt, "");
+    plotFn(mt, f, "#ffd166", 3);
+    pText(mt.B.x0 + 4, mt.B.y0 + 16, "f(x)", "#ffd166", 13);
+    // 下:A(x) + 當前點切線斜率
+    plotAxes(mb, "x");
+    plotFn(mb, A, "#38bdf8", 3);
+    pText(mb.B.x0 + 4, mb.B.y0 + 16, "A(x) = 累積面積", "#38bdf8", 13);
+    const slope = f(s.x0), ay = A(s.x0);
+    // A 上的切線(斜率 = f(x0)),下圖 y 尺度不同需換算像素斜率
+    const kx = (mb.B.x1 - mb.B.x0) / (mb.xmax - mb.xmin), ky = (mb.B.y1 - mb.B.y0) / (mb.ymax - mb.ymin);
+    const pxSlope = -slope * ky / kx; // 像素空間的切線斜率(dpy/dpx)
+    const cx = mb.X(s.x0), cy = mb.Y(ay), L = 70;
+    g.strokeStyle = PC.post; g.lineWidth = 2.5; g.beginPath();
+    g.moveTo(cx - L, cy - pxSlope * L);
+    g.lineTo(cx + L, cy + pxSlope * L);
+    g.stroke();
+    drawDisc(cx, cy, 6, PC.post, null);
+    // 探針垂直線貫穿兩圖
+    g.strokeStyle = TH.demoAxis; g.lineWidth = 1.5; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(mt.X(s.x0), mt.B.y0); g.lineTo(mt.X(s.x0), mt.B.y1); g.stroke();
+    drawDisc(mt.X(s.x0), mt.Y(f(s.x0)), 6, "#ffd166", null);
+    g.setLineDash([]);
+    // 頂圖 x 軸握把
+    const hx = mt.X(s.x0);
+    g.fillStyle = "#ffd166"; g.beginPath();
+    g.moveTo(hx, mt.B.y1 - 12); g.lineTo(hx - 8, mt.B.y1 + 2); g.lineTo(hx + 8, mt.B.y1 + 2); g.closePath(); g.fill();
+    readout.innerHTML = `x = ${fmt(s.x0)}　f(x) = <b>${fmt(slope)}</b> = A 的斜率　A(x) = ${fmt(ay)}${slope < 0.06 ? "　<b style='color:#4ade80'>A 走平</b>" : slope > 1.94 ? "　<b style='color:#4ade80'>A 最陡</b>" : ""}`;
+    if (slope > 1.94) markGoal("C4-peak");
+    if (slope < 0.06) markGoal("C4-zero");
+  },
+},
+];
+
 /* ---------- 科目 ---------- */
 const SUBJECTS = {
   la: { name: "線性代數", levels: LA_LEVELS },
   prob: { name: "機率與統計", levels: PROB_LEVELS },
+  calc: { name: "微積分", levels: CALC_LEVELS },
 };
 let curSubject = "la";
 
@@ -1543,6 +1820,30 @@ let curIdx = 0;
 const cur = () => levels[curIdx];
 
 function levelDone(lv) { return lv.goals.every((gl) => progress[gl.id]); }
+function subjectDone(key) { return SUBJECTS[key].levels.every(levelDone); }
+function allLevels() { return Object.values(SUBJECTS).flatMap((s) => s.levels); }
+
+const overallEl = document.getElementById("overall");
+const certEl = document.getElementById("cert");
+function renderOverall() {
+  const all = allLevels(), done = all.filter(levelDone).length;
+  overallEl.textContent = `　🎓 總進度 ${done}/${all.length}`;
+}
+function updateCert() {
+  const allDone = Object.keys(SUBJECTS).every(subjectDone);
+  const key = curSubject, sub = SUBJECTS[key];
+  const date = new Date().toISOString().slice(0, 10);
+  if (allDone) {
+    certEl.className = "show";
+    certEl.innerHTML = `<div class="big">🏆 全通關!三科 ${allLevels().length} 關全部完成</div><div class="sub">數感實驗室 · ${date} · 截圖留念吧</div>`;
+  } else if (subjectDone(key)) {
+    certEl.className = "show";
+    certEl.innerHTML = `<div class="big">🎓 恭喜完成【${sub.name}】${sub.levels.length} 關!</div><div class="sub">數感實驗室 · ${date} · 換個科目繼續?</div>`;
+  } else {
+    certEl.className = "";
+    certEl.innerHTML = "";
+  }
+}
 
 function renderSubjects() {
   subjEl.innerHTML = "";
@@ -1602,7 +1903,7 @@ function switchLevel(k) {
   lv._sync = null;
   lv.enter && lv.enter();
   lv.controls && lv.controls(ctl);
-  renderGoals(); renderTabs(); renderSubjects();
+  renderGoals(); renderTabs(); renderSubjects(); renderOverall(); updateCert();
   // 第一次進入且尚未通關 → 自動播示範
   if (lv.demo && !demoSeen[lv.id] && !levelDone(lv)) {
     demoSeen[lv.id] = true;
@@ -1622,6 +1923,15 @@ function frame() {
   cur().draw();
   requestAnimationFrame(frame);
 }
+
+// 主題初始化 + 切換鈕
+applyTheme(themeName);
+const themeBtn = document.getElementById("theme-btn");
+themeBtn.textContent = themeName === "light" ? "☀️" : "🌙";
+themeBtn.onclick = () => {
+  applyTheme(themeName === "light" ? "dark" : "light");
+  themeBtn.textContent = themeName === "light" ? "☀️" : "🌙";
+};
 
 renderSubjects();
 switchLevel(0);

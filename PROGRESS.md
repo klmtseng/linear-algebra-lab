@@ -58,3 +58,15 @@
   - P9 條件機率:把世界縮到 B(框外壓暗+剪裁高亮 A∩B),P(A|B)=P(A∩B)/P(B);A⊆B / P(A|B)=0
 - 引擎:新增 lensArea/drawDisc 幾何helper;沿用螢幕座標 draggable
 - 驗收(Chromium):4 新關互動+goal 全 PASS,零 error(P8/P9 早期測試失敗是測試座標 stale,非功能問題)
+
+## 2026-07-06 M6:第三科目微積分 + 進度總覽/證書 + 淺色主題(共 26 關)
+- 微積分 4 關(函數繪圖 plotMap/plotAxes/plotFn):
+  - C1 極限與夾擠:cos x ≤ sin x/x ≤ 1,探針→0 看夾擠+x=0 的「洞」
+  - C2 導數:割線 h→0 縮成切線,x 軸握把移動找斜率=0 的極值
+  - C3 積分:黎曼和 N 格逼近曲線下面積,粗→細收斂
+  - C4 微積分基本定理:上 f(x)/下 A(x) 雙圖,A′(x)=f(x)(f 高處 A 陡、f=0 處 A 平)
+- 進度總覽:header「🎓 總進度 X/26」+ 科目 pill 完成數
+- 完成證書:單科全過顯示恭喜卡、三科全過顯示 🏆 全通關卡(可截圖)
+- 淺色課程主題:🌙/☀️ 切換,CSS var + 畫布顏色(TH/PC)雙層同步,localStorage 記住
+- 引擎:C2/C4 改用 x 軸 ▲ 握把(手機好抓,取代 curve 上小點)
+- 驗收(Chromium):微積分 4 關互動+goal、證書、主題切換全 PASS,零 error
