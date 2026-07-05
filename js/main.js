@@ -270,6 +270,9 @@ const EP = {
   P2: ["概率EP05 正態分佈 ▶", "https://www.youtube.com/watch?v=x_pJlGB0S5c"],
   P3: ["概率EP06 健檢陽性的盲點 ▶", "https://www.youtube.com/watch?v=tFUBBCfnjs8"],
   P4: ["概率EP07 貝氏定理動態修正 ▶", "https://www.youtube.com/watch?v=TKvSIo8kKBg"],
+  P5: ["概率EP02 隨機變數如何量化 ▶", "https://www.youtube.com/watch?v=QlKIuWLcdJ8"],
+  P6: ["統計推論 大數法則 ▶", "https://www.youtube.com/watch?v=Zz_2gT2RHKU"],
+  P7: ["統計推論 中心極限定理 ▶", "https://www.youtube.com/watch?v=Zz_2gT2RHKU"],
 };
 const readout = document.getElementById("readout");
 
@@ -658,6 +661,146 @@ const LA_LEVELS = [
     readout.innerHTML = `A·u = (${fmt(Au.x)}, ${fmt(Au.y)})　${msg}`;
   },
 },
+
+/* ─── 關 9:投影到直線 + 投影矩陣 ─── */
+{
+  id: "L9", short: "投影矩陣", title: "關 9|投影:把向量壓到一條線上", ep: 3,
+  intro: `<p>把向量 <span class="hl">v</span> 投影到一條直線,就是問:「v 的影子落在這條線的哪裡?」答案是從 v 的頭<b>垂直</b>落到線上的那一點。</p><p>拖動 <span class="hl">v</span> 和直線方向 <span style="color:var(--extra)"><b>d</b></span>。把直線<b>轉到跟 v 同向</b>,影子就等於 v 本身;把直線<b>轉到垂直於 v</b>,影子縮成 0。</p>`,
+  formal: `<p class="math">proj_d(v) = (v·d / d·d)·d。投影矩陣 P = d dᵀ / (dᵀd),滿足 P² = P、Pᵀ = P。P 把整個平面壓到 d 所在的直線上。</p>`,
+  goals: [
+    { id: "L9-full", text: "把直線轉到與 v 同向,讓影子 = v" },
+    { id: "L9-zero", text: "把直線轉到垂直於 v,讓影子 = 0" },
+  ],
+  state: { v: V(2, 2.5), d: V(3, 0.4) },
+  enter() { this.state.v = V(2, 2.5); this.state.d = V(3, 0.4); },
+  demo() { const s = this.state; return [
+    { cap: "紫色直線 d,黃色向量 v。影子 = v 垂直落到 d 上", dur: 2400 },
+    { vec: [() => s.d, (w) => s.d = w, V(2, 2.5)], cap: "把 d 轉到跟 v 同向……影子伸長到 = v", dur: 2200 },
+    { vec: [() => s.d, (w) => s.d = w, V(-2.5, 2)], cap: "把 d 轉到垂直於 v……影子縮成一點:0", dur: 2400 },
+    { vec: [() => s.d, (w) => s.d = w, V(3, 0.4)], cap: "換你:各做出一次「影子=v」和「影子=0」", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state;
+    return [{ get: () => s.v, set: (w) => { s.v = w; } }, { get: () => s.d, set: (w) => { s.d = w; } }];
+  },
+  draw() {
+    const s = this.state, dd = dot(s.d, s.d);
+    drawGrid(MI(), { original: false });
+    // 直線(雙向延伸)
+    if (dd > 0.02) {
+      const dir = scl(s.d, 1 / len(s.d)), L = 9;
+      g.strokeStyle = "#4a3d75"; g.lineWidth = 2;
+      const a = toScr(scl(dir, -L)), b = toScr(scl(dir, L));
+      g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    }
+    const proj = dd > 0.02 ? scl(s.d, dot(s.v, s.d) / dd) : V(0, 0);
+    drawDash(s.v, proj, COL.blue);
+    drawArrow(V(0, 0), s.d, COL.extra, 3, "d");
+    drawArrow(V(0, 0), s.v, COL.vec, 3.5, "v");
+    drawDot(proj, COL.blue, 7);
+    labelAt(proj, "影子", COL.blue, 8, 18);
+    const onFull = len(sub(proj, s.v)) < 0.18 && len(s.v) > 1;
+    const isZero = len(proj) < 0.12 && len(s.v) > 1;
+    readout.innerHTML = `影子 = (${fmt(proj.x)}, ${fmt(proj.y)})　長度 ${fmt(len(proj))}${onFull ? "　<b style='color:#4ade80'>= v!</b>" : isZero ? "　<b style='color:#4ade80'>= 0!(v ⊥ d)</b>" : ""}`;
+    if (onFull) markGoal("L9-full");
+    if (isZero) markGoal("L9-zero");
+  },
+},
+
+/* ─── 關 10:基變換 ─── */
+{
+  id: "L10", short: "基變換", title: "關 10|同一個向量,換一組基底來描述", ep: 1,
+  intro: `<p>座標從來不是絕對的,它只是「在某組基底下的配方」。同一個 <span class="hl">v</span>,用標準基底看是一組數字,用另一組基底 <span class="ih">b₁</span>、<span class="jh">b₂</span> 看又是另一組。</p><p>拖動基底和 v。目標:讓 v 在新基底下的座標剛好是 <b>(1, 2)</b>——也就是讓 v 落在 1·b₁ + 2·b₂ 的星星上。再把兩個基向量弄成<b>不垂直的斜基底</b>,看座標照樣讀得出來。</p>`,
+  formal: `<p class="math">設 B = [b₁ | b₂],則 v 在新基底下的座標 [v]_B = B⁻¹v。基變換不改變向量本身,只換一套「量它的尺」。</p>`,
+  goals: [
+    { id: "L10-hit", text: "讓 v 的新座標 = (1, 2)(落在星星上)" },
+    { id: "L10-skew", text: "把 b₁、b₂ 弄成不垂直的斜基底" },
+  ],
+  state: { b1: V(1.5, 0.3), b2: V(-0.4, 1.4), v: V(2.4, 0.9) },
+  enter() { this.state.b1 = V(1.5, 0.3); this.state.b2 = V(-0.4, 1.4); this.state.v = V(2.4, 0.9); },
+  demo() { const s = this.state; return [
+    { cap: "斜格線 = 新基底 b₁、b₂ 張出的座標系", dur: 2400 },
+    { cam: { scale: 82, x: 0.7, y: 1.6 }, cap: "星星在 1·b₁ + 2·b₂——就是新座標 (1,2) 的位置", dur: 2600 },
+    { cam: "reset", vec: [() => s.v, (w) => s.v = w, add(s.b1, scl(s.b2, 2))], cap: "把 v 拖到星星上,新座標就變成 (1,2)", dur: 2200 },
+    { vec: [() => s.v, (w) => s.v = w, V(2.4, 0.9)], cap: "換你:命中 (1,2),再把基底弄斜", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state;
+    return [
+      { get: () => s.b1, set: (w) => { s.b1 = w; } },
+      { get: () => s.b2, set: (w) => { s.b2 = w; } },
+      { get: () => s.v, set: (w) => { s.v = w; } },
+    ];
+  },
+  draw() {
+    const s = this.state, det = cross(s.b1, s.b2);
+    drawGrid(M(s.b1, s.b2));
+    const star = add(s.b1, scl(s.b2, 2));
+    drawStar(star, COL.star);
+    drawArrow(V(0, 0), s.b1, COL.iHat, 3.5, "b₁");
+    drawArrow(V(0, 0), s.b2, COL.jHat, 3.5, "b₂");
+    drawArrow(V(0, 0), s.v, COL.vec, 3.5, "v");
+    let c1 = 0, c2 = 0;
+    if (Math.abs(det) > 0.02) {
+      c1 = (s.b2.y * s.v.x - s.b2.x * s.v.y) / det;
+      c2 = (-s.b1.y * s.v.x + s.b1.x * s.v.y) / det;
+    }
+    const hit = Math.abs(c1 - 1) < 0.12 && Math.abs(c2 - 2) < 0.12;
+    const cosb = Math.abs(dot(s.b1, s.b2)) / Math.max(1e-6, len(s.b1) * len(s.b2));
+    const skew = cosb > 0.2 && len(s.b1) > 0.5 && len(s.b2) > 0.5;
+    readout.innerHTML = `[v]<sub>B</sub> = (<b>${fmt(c1)}</b>, <b>${fmt(c2)}</b>)　目標 (1, 2)${hit ? "　<b style='color:#4ade80'>✓</b>" : ""}`;
+    if (hit) markGoal("L10-hit");
+    if (skew) markGoal("L10-skew");
+  },
+},
+
+/* ─── 關 11:SVD 奇異值 ─── */
+{
+  id: "L11", short: "SVD 奇異值", title: "關 11|SVD:任何矩陣都是「轉 → 拉 → 轉」", ep: 3,
+  intro: `<p>把一個<b>單位圓</b>丟進任何矩陣,出來一定是<b>橢圓</b>(或塌成線段)。橢圓的兩條半軸長,就是矩陣的<b>奇異值</b> σ₁ ≥ σ₂——它們量的是「這個變換在兩個互相垂直的方向上,各拉伸了多少」。</p><p>拖動 <span class="ih">î</span>、<span class="jh">ĵ</span> 改變矩陣。讓 <b>σ₁ = σ₂</b>(橢圓變回正圓,只有旋轉+等比縮放);再讓 <b>σ₂ = 0</b>(橢圓塌成線段,秩掉到 1)。</p>`,
+  formal: `<p class="math">任意 M = U Σ Vᵀ:Vᵀ 先旋轉、Σ = diag(σ₁,σ₂) 沿軸拉伸、U 再旋轉。σᵢ = √(MᵀM 的特徵值),且 σ₁σ₂ = |det M|(面積縮放率)。σ₂ = 0 ⇔ 秩 1。</p>`,
+  goals: [
+    { id: "L11-circle", text: "讓 σ₁ ≈ σ₂(橢圓變回正圓)" },
+    { id: "L11-sing", text: "讓 σ₂ ≈ 0(橢圓塌成線段,秩 1)" },
+  ],
+  state: { i: V(1.6, 0.5), j: V(-0.6, 1.2) },
+  enter() { this.state.i = V(1.6, 0.5); this.state.j = V(-0.6, 1.2); },
+  demo() { const s = this.state; return [
+    { cap: "淡圈 = 單位圓,金色 = 它被矩陣變成的橢圓", dur: 2400 },
+    { vec: [() => s.i, (w) => s.i = w, V(1.4, 0)], vec2: [() => s.j, (w) => s.j = w, V(0, 1.4)], cap: "調成正圓:σ₁ = σ₂,純旋轉+等比縮放", dur: 2400 },
+    { vec: [() => s.i, (w) => s.i = w, V(2, 1)], vec2: [() => s.j, (w) => s.j = w, V(1, 0.5)], cap: "把 î、ĵ 弄共線:橢圓塌成線段,σ₂ = 0", dur: 2600 },
+    { vec: [() => s.i, (w) => s.i = w, V(1.6, 0.5)], vec2: [() => s.j, (w) => s.j = w, V(-0.6, 1.2)], cap: "換你:做出正圓,再做出塌陷", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state;
+    return [{ get: () => s.i, set: (w) => { s.i = w; } }, { get: () => s.j, set: (w) => { s.j = w; } }];
+  },
+  sv() {
+    const s = this.state, a = dot(s.i, s.i), b = dot(s.i, s.j), c = dot(s.j, s.j);
+    const tr = a + c, dt = a * c - b * b, disc = Math.sqrt(Math.max(0, tr * tr - 4 * dt));
+    return [Math.sqrt(Math.max(0, (tr + disc) / 2)), Math.sqrt(Math.max(0, (tr - disc) / 2))];
+  },
+  draw() {
+    const s = this.state, m = M(s.i, s.j);
+    drawGrid(m);
+    // 原始單位圓(淡)
+    g.strokeStyle = "#39456e"; g.lineWidth = 1.5; g.beginPath();
+    for (let k = 0; k <= 60; k++) { const th = k / 60 * 2 * Math.PI, p = toScr(V(Math.cos(th), Math.sin(th))); k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y); }
+    g.stroke();
+    // 變換後橢圓(金)
+    g.strokeStyle = COL.gold; g.lineWidth = 3; g.beginPath();
+    for (let k = 0; k <= 60; k++) { const th = k / 60 * 2 * Math.PI, p = toScr(applyM(m, V(Math.cos(th), Math.sin(th)))); k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y); }
+    g.stroke();
+    drawArrow(V(0, 0), s.i, COL.iHat, 3, "î");
+    drawArrow(V(0, 0), s.j, COL.jHat, 3, "ĵ");
+    const [s1, s2] = this.sv();
+    const circle = Math.abs(s1 - s2) < 0.12 && s1 > 0.4;
+    const sing = s2 < 0.1 && s1 > 0.4;
+    readout.innerHTML = `σ₁ = <b>${fmt(s1)}</b>　σ₂ = <b>${fmt(s2)}</b>　秩 ${s2 < 0.1 ? 1 : 2}${circle ? "　<b style='color:#4ade80'>正圓!</b>" : sing ? "　<b style='color:#fbbf24'>塌成線段!</b>" : ""}`;
+    if (circle) markGoal("L11-circle");
+    if (sing) markGoal("L11-sing");
+  },
+},
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -940,6 +1083,188 @@ const PROB_LEVELS = [
     readout.innerHTML = `後驗 = <b>${(s.p * 100).toFixed(1)}%</b>${s.p > 0.9 ? "　<b style='color:#4ade80'>✓ 信念已高</b>" : ""}`;
     if (s.p > 0.9) markGoal("P4-up");
     if (s.hist.length && s.hist[s.hist.length - 1] === 0 && s.hist.slice(0, -1).some((e) => e === 1)) markGoal("P4-down");
+  },
+},
+
+/* ─── P5:隨機變數與期望值 = 分布的重心 ─── */
+{
+  id: "P5", short: "期望值", title: "關 5|期望值:機率分布的「重心」", ep: "P5", subj: "prob",
+  intro: `<p>隨機變數把「結果」對應成數字——擲一顆骰子,點數 1~6 就是它的取值。每個值有各自的機率(長條高度)。</p><p><b>期望值 E[X]</b> 不是「最常出現的值」,而是整條分布的<b>重心</b>:把長條想成秤上的砝碼,支點放在剛好平衡的位置。拖「灌鉛」滑桿讓骰子偏心,看重心(三角支點)怎麼滑動。</p>`,
+  formal: `<p class="math">離散隨機變數 E[X] = Σ xₖ·P(X=xₖ)。它是機率加權的平均、分布的一階矩(質心)。公平骰 E[X] = (1+…+6)/6 = 3.5。</p>`,
+  goals: [
+    { id: "P5-high", text: "把骰子灌成高點偏重,讓 E[X] ≥ 4.5" },
+    { id: "P5-low", text: "反過來偏重低點,讓 E[X] ≤ 2.5" },
+  ],
+  state: { bias: 0 },
+  enter() { this.state.bias = 0; },
+  probs() {
+    const s = this.state, w = [], base = 3.5;
+    for (let k = 1; k <= 6; k++) w.push(Math.exp(s.bias * (k - base)));
+    const sum = w.reduce((a, b) => a + b, 0);
+    return w.map((x) => x / sum);
+  },
+  demo() { const s = this.state; return [
+    { cap: "公平骰:六根等高長條,重心(三角)在正中 3.5", dur: 2400 },
+    { num: [() => s.bias, (v) => s.bias = v, 0.6], cap: "往高點灌鉛:右邊變重,重心右移", dur: 2200 },
+    { num: [() => s.bias, (v) => s.bias = v, -0.6], cap: "往低點灌鉛:重心滑到左邊", dur: 2200 },
+    { num: [() => s.bias, (v) => s.bias = v, 0], cap: "期望值 = 支點平衡處。換你推到兩端", dur: 1600 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `<div class="row"><label>灌鉛</label><input type="range" id="pbias" min="-1" max="1" step="0.02" value="0"><span class="val" id="vbias">0</span></div>
+      <div class="row" style="font-size:.82rem;color:var(--dim)">← 偏重低點　　偏重高點 →</div>`;
+    el.querySelector("#pbias").oninput = (e) => { s.bias = +e.target.value; el.querySelector("#vbias").textContent = fmt(s.bias); };
+    this._sync = () => { el.querySelector("#pbias").value = s.bias; el.querySelector("#vbias").textContent = fmt(s.bias); };
+  },
+  draw() {
+    const p = this.probs();
+    const X0 = 90, Y0 = 90, W = 460, H = 380, Ybase = Y0 + H;
+    const maxP = Math.max(...p, 0.3), bw = W / 6;
+    const E = p.reduce((a, pk, k) => a + (k + 1) * pk, 0);
+    // 長條
+    for (let k = 0; k < 6; k++) {
+      const h = p[k] / maxP * H, x = X0 + k * bw;
+      g.fillStyle = PC.fill2; g.fillRect(x + 6, Ybase - h, bw - 12, h);
+      g.strokeStyle = PC.prior; g.lineWidth = 1.5; g.strokeRect(x + 6, Ybase - h, bw - 12, h);
+      pText(x + bw / 2, Ybase + 22, String(k + 1), PC.dim, 15, "center");
+      pText(x + bw / 2, Ybase - h - 8, (p[k] * 100).toFixed(0) + "%", PC.dim, 12, "center");
+    }
+    g.strokeStyle = PC.axis; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(X0, Ybase); g.lineTo(X0 + W, Ybase); g.stroke();
+    // 重心三角支點
+    const ex = X0 + (E - 0.5) * bw;
+    g.fillStyle = PC.curve; g.beginPath();
+    g.moveTo(ex, Ybase + 6); g.lineTo(ex - 12, Ybase + 30); g.lineTo(ex + 12, Ybase + 30); g.closePath(); g.fill();
+    pText(ex, Ybase + 48, "E[X] = " + E.toFixed(2), PC.curve, 15, "center", true);
+    readout.innerHTML = `期望值 E[X] = <b>${E.toFixed(3)}</b>　(公平骰為 3.5)`;
+    if (E >= 4.5) markGoal("P5-high");
+    if (E <= 2.5) markGoal("P5-low");
+  },
+},
+
+/* ─── P6:大數法則 ─── */
+{
+  id: "P6", short: "大數法則", title: "關 6|大數法則:擲越多次,平均越靠近真值", ep: "P6", subj: "prob",
+  intro: `<p>單次擲骰完全隨機,但把<b>累積平均</b>畫出來,會看到它一路晃動、然後<b>收斂</b>到期望值 3.5。前幾十次上下亂跳,幾百次後就黏在紅線附近——這就是大數法則。</p><p>按「擲 100 次」一批批餵資料,看藍線怎麼從劇烈震盪慢慢平靜下來。<b>注意:早期的偏離是正常的</b>,不是骰子壞了。</p>`,
+  formal: `<p class="math">獨立同分布 X₁,…,Xₙ,樣本平均 X̄ₙ = (1/n)ΣXᵢ。大數法則:n→∞ 時 X̄ₙ → E[X](幾乎必然)。收斂速率 ~ 1/√n,故早期波動大。</p>`,
+  goals: [
+    { id: "P6-early", text: "先擲一小批(≥ 20 次),觀察早期劇烈震盪" },
+    { id: "P6-converge", text: "累積 ≥ 500 次,看平均收斂到 3.5 附近" },
+  ],
+  state: { series: [], n: 0, sum: 0 },
+  enter() { this.state.series = []; this.state.n = 0; this.state.sum = 0; },
+  roll(k) {
+    const s = this.state;
+    for (let i = 0; i < k; i++) { s.sum += 1 + Math.floor(Math.random() * 6); s.n++; s.series.push(s.sum / s.n); }
+  },
+  demo() { const self = this; return [
+    { call: () => self.enter(), cap: "從零開始,一批批擲公平骰", dur: 1400 },
+    { call: () => self.roll(15), cap: "才 15 次:累積平均上下亂跳,離 3.5 很遠也正常", dur: 2600 },
+    { call: () => self.roll(85), cap: "累積到 100 次:震盪明顯收斂", dur: 2400 },
+    { call: () => self.roll(400), cap: "500 次:藍線幾乎黏在紅線 3.5 上", dur: 2600 },
+    { call: () => self.enter(), cap: "換你:先擲一小批看亂跳,再狂擲到收斂", dur: 1600 },
+  ]; },
+  controls(el) {
+    const self = this;
+    el.innerHTML = `<div class="row">
+        <button class="primary" id="r10">擲 10 次</button>
+        <button id="r100">擲 100 次</button>
+        <button id="rrst">重來</button>
+      </div>`;
+    el.querySelector("#r10").onclick = () => self.roll(10);
+    el.querySelector("#r100").onclick = () => self.roll(100);
+    el.querySelector("#rrst").onclick = () => self.enter();
+  },
+  draw() {
+    const s = this.state;
+    const X0 = 80, Y0 = 80, W = 500, H = 420, Yb = Y0 + H;
+    const ymin = 1, ymax = 6;
+    const Y = (v) => Yb - (v - ymin) / (ymax - ymin) * H;
+    // 座標
+    g.strokeStyle = PC.axis; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(X0, Y0); g.lineTo(X0, Yb); g.lineTo(X0 + W, Yb); g.stroke();
+    for (let v = 1; v <= 6; v++) { pText(X0 - 10, Y(v) + 5, String(v), PC.dim, 12, "right"); g.strokeStyle = PC.grid; g.beginPath(); g.moveTo(X0, Y(v)); g.lineTo(X0 + W, Y(v)); g.stroke(); }
+    // 3.5 目標線
+    g.strokeStyle = PC.sick; g.setLineDash([6, 4]); g.lineWidth = 2;
+    g.beginPath(); g.moveTo(X0, Y(3.5)); g.lineTo(X0 + W, Y(3.5)); g.stroke(); g.setLineDash([]);
+    pText(X0 + W + 4, Y(3.5) + 4, "3.5", PC.sick, 12);
+    // 累積平均曲線
+    if (s.n > 1) {
+      g.strokeStyle = PC.prior; g.lineWidth = 2.5; g.beginPath();
+      for (let k = 0; k < s.series.length; k++) {
+        const px = X0 + k / (s.n - 1) * W, py = Y(s.series[k]);
+        k ? g.lineTo(px, py) : g.moveTo(px, py);
+      }
+      g.stroke();
+    }
+    pText(X0, Y0 - 12, `已擲 ${s.n} 次`, PC.dim, 14);
+    const cur = s.n ? s.series[s.n - 1] : 0;
+    readout.innerHTML = `擲了 <b>${s.n}</b> 次　累積平均 = <b>${s.n ? cur.toFixed(3) : "—"}</b>${s.n >= 500 && Math.abs(cur - 3.5) < 0.15 ? "　<b style='color:#4ade80'>✓ 已收斂</b>" : ""}`;
+    if (s.n >= 20) markGoal("P6-early");
+    if (s.n >= 500 && Math.abs(cur - 3.5) < 0.2) markGoal("P6-converge");
+  },
+},
+
+/* ─── P7:中心極限定理 ─── */
+{
+  id: "P7", short: "中心極限", title: "關 7|中心極限定理:多個相加,自動變鐘形", ep: "P7", subj: "prob",
+  intro: `<p>一顆骰子的分布是<b>平的</b>(1~6 機率均等)。但把 <b>N 顆骰子的點數加起來</b>,分布會神奇地隆起成<b>鐘形</b>——而且 N 越大越像正態分佈,不管原本長什麼樣。</p><p>拖 N 滑桿。N = 1 是平的,N ≥ 8 幾乎就是完美鐘形。金色曲線是理論上對應的正態分佈,看它怎麼越貼越準。這就是為什麼常態分佈到處都是。</p>`,
+  formal: `<p class="math">獨立同分布 X₁,…,X_N,和 S_N = ΣXᵢ。中心極限定理:(S_N − Nμ)/(σ√N) → N(0,1)。與 Xᵢ 原分布形狀無關,只要變異數有限。</p>`,
+  goals: [
+    { id: "P7-flat", text: "把 N 調到 1,確認單顆骰是平的(均勻)" },
+    { id: "P7-bell", text: "把 N 調到 ≥ 8,看鐘形浮現" },
+  ],
+  state: { N: 1 },
+  enter() { this.state.N = 1; },
+  dist(N) { // N 顆骰和的分布(卷積)
+    let d = [0, 1]; // index = 點數
+    for (let n = 0; n < N; n++) {
+      const nd = new Array(d.length + 6).fill(0);
+      for (let i = 0; i < d.length; i++) if (d[i]) for (let f = 1; f <= 6; f++) nd[i + f] += d[i] / 6;
+      d = nd;
+    }
+    return d;
+  },
+  demo() { const s = this.state; return [
+    { num: [() => s.N, (v) => s.N = Math.round(v), 1], cap: "N = 1:單顆骰,分布完全平坦(均勻)", dur: 2200 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 2], cap: "N = 2:兩顆相加,中間 7 最常見,出現三角形", dur: 2200 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 5], cap: "N = 5:已經隆成鐘形", dur: 2000 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 10], cap: "N = 10:幾乎完美貼合金色的正態曲線", dur: 2400 },
+    { num: [() => s.N, (v) => s.N = Math.round(v), 1], cap: "換你:從 1 拉到 8+,看鐘形自己長出來", dur: 1600 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `<div class="row"><label>N 骰數</label><input type="range" id="pN" min="1" max="12" step="1" value="1"><span class="val" id="vN">1</span></div>`;
+    el.querySelector("#pN").oninput = (e) => { s.N = +e.target.value; el.querySelector("#vN").textContent = s.N; };
+    this._sync = () => { el.querySelector("#pN").value = s.N; el.querySelector("#vN").textContent = s.N; };
+  },
+  draw() {
+    const N = Math.max(1, Math.round(this.state.N));
+    const d = this.dist(N), lo = N, hi = 6 * N;
+    const X0 = 80, Y0 = 80, W = 500, H = 420, Yb = Y0 + H;
+    let maxP = 0; for (let k = lo; k <= hi; k++) maxP = Math.max(maxP, d[k]);
+    const span = hi - lo, bw = W / (span + 1);
+    // 長條
+    for (let k = lo; k <= hi; k++) {
+      const h = d[k] / maxP * H, x = X0 + (k - lo) * bw;
+      g.fillStyle = PC.fill2; g.fillRect(x + 1, Yb - h, Math.max(1, bw - 2), h);
+    }
+    g.strokeStyle = PC.axis; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(X0, Yb); g.lineTo(X0 + W, Yb); g.stroke();
+    // 理論正態曲線
+    const mu = 3.5 * N, sig = Math.sqrt(N * 35 / 12);
+    g.strokeStyle = PC.curve; g.lineWidth = 3; g.beginPath();
+    for (let px = 0; px <= W; px += 3) {
+      const val = lo + px / W * span, pd = gaussPDF(val, mu, sig);
+      const py = Yb - pd / (maxP) * H;
+      px ? g.lineTo(X0 + px, py) : g.moveTo(X0 + px, py);
+    }
+    g.stroke();
+    pText(X0, Y0 - 12, `${N} 顆骰的點數和(範圍 ${lo}–${hi})`, PC.dim, 14);
+    pText(X0 + W, Y0 + 6, "金線 = 對應的正態分佈", PC.curve, 12, "right");
+    readout.innerHTML = `N = <b>${N}</b>　和的平均 ${mu.toFixed(1)}、標準差 ${sig.toFixed(2)}${N === 1 ? "　(平坦=均勻)" : N >= 8 ? "　<b style='color:#4ade80'>✓ 鐘形</b>" : ""}`;
+    if (N === 1) markGoal("P7-flat");
+    if (N >= 8) markGoal("P7-bell");
   },
 },
 ];
