@@ -159,9 +159,9 @@ canvas.addEventListener("pointerdown", (ev) => {
   if (player.active) { player.stop(); return; } // 示範中點一下 = 跳過、接手
   const p = canvasPos(ev);
   const dl = cur().draggables ? cur().draggables() : [];
-  let best = null, bestD = 26;
+  let best = null, bestD = 30;
   for (const d of dl) {
-    const s = toScr(d.get());
+    const s = d.getScreen ? d.getScreen() : toScr(d.get());
     const dist = Math.hypot(s.x - p.x, s.y - p.y);
     if (dist < bestD) { bestD = dist; best = d; }
   }
@@ -170,6 +170,11 @@ canvas.addEventListener("pointerdown", (ev) => {
 canvas.addEventListener("pointermove", (ev) => {
   if (!dragTarget) return;
   const p = canvasPos(ev);
+  if (dragTarget.setScreen) { // 螢幕座標拖曳(概率模組的門檻線等)
+    dragTarget.setScreen(p.x, p.y);
+    cur().onChange && cur().onChange();
+    return;
+  }
   let w = fromScr(p.x, p.y);
   w.x = Math.max(-5.2, Math.min(5.2, w.x));
   w.y = Math.max(-5.2, Math.min(5.2, w.y));
@@ -211,8 +216,9 @@ const player = {
       const [get, set, to] = st[key], from = { ...get() };
       fns.push((t) => set(V(lerp(from.x, to.x, t), lerp(from.y, to.y, t))));
     }
-    if (st.num) {
-      const [get, set, to] = st.num, from = get();
+    for (const key of ["num", "num2"]) {
+      if (!st[key]) continue;
+      const [get, set, to] = st[key], from = get();
       fns.push((t) => set(lerp(from, to, t)));
     }
     if (st.cam) {
@@ -259,10 +265,15 @@ const EP = {
   1: ["EP1 基向量與張成空間 ▶", "https://www.youtube.com/watch?v=ZvDpkXAvWGk"],
   2: ["EP2 行列式與矩陣秩 ▶", "https://www.youtube.com/watch?v=9gRzBcHhYXw"],
   3: ["EP3 特徵值與內積投影 ▶", "https://www.youtube.com/watch?v=Ddw4H_pT_AM"],
+  // 概率系列
+  P1: ["概率EP04 連續變數與機率密度 ▶", "https://www.youtube.com/watch?v=dGWDybzB8y8"],
+  P2: ["概率EP05 正態分佈 ▶", "https://www.youtube.com/watch?v=x_pJlGB0S5c"],
+  P3: ["概率EP06 健檢陽性的盲點 ▶", "https://www.youtube.com/watch?v=tFUBBCfnjs8"],
+  P4: ["概率EP07 貝氏定理動態修正 ▶", "https://www.youtube.com/watch?v=TKvSIo8kKBg"],
 };
 const readout = document.getElementById("readout");
 
-const levels = [
+const LA_LEVELS = [
 
 /* ─── 關 1:向量 = 基向量的組合 ─── */
 {
@@ -649,12 +660,326 @@ const levels = [
 },
 ];
 
+/* ═══════════════════════════════════════════════════════════
+   概率模組 — 自己的 2D 繪圖(螢幕座標,不經 toScr/相機)
+   ═══════════════════════════════════════════════════════════ */
+const PC = { // 概率配色(比線代更柔和,近 Anthropic 課程感)
+  ink: "#e8ecf8", dim: "#9aa5c4", axis: "#55648f",
+  curve: "#ffd166", fill: "rgba(255,209,102,.30)", fill2: "rgba(56,189,248,.28)",
+  sick: "#ff5c7a", well: "#4ade80", pos: "#fbbf24", grid: "#212a4b",
+  prior: "#38bdf8", post: "#a78bfa",
+};
+// 繪圖框(畫布內留白)
+const PLOT = { x0: 70, y0: 70, x1: 610, y1: 560 };
+const gaussPDF = (x, mu, sig) => Math.exp(-((x - mu) ** 2) / (2 * sig * sig)) / (sig * Math.sqrt(2 * Math.PI));
+
+function pAxes(xmin, xmax, ymax, xlabel) {
+  g.strokeStyle = PC.axis; g.lineWidth = 1.5;
+  g.beginPath();
+  g.moveTo(PLOT.x0, PLOT.y1); g.lineTo(PLOT.x1, PLOT.y1); // x 軸
+  g.moveTo(PLOT.x0, PLOT.y0); g.lineTo(PLOT.x0, PLOT.y1); // y 軸
+  g.stroke();
+  g.fillStyle = PC.dim; g.font = "13px sans-serif"; g.textAlign = "center";
+  for (let k = Math.ceil(xmin); k <= Math.floor(xmax); k++) {
+    const px = PLOT.x0 + (k - xmin) / (xmax - xmin) * (PLOT.x1 - PLOT.x0);
+    g.fillText(String(k), px, PLOT.y1 + 20);
+    g.strokeStyle = PC.grid; g.beginPath(); g.moveTo(px, PLOT.y0); g.lineTo(px, PLOT.y1); g.stroke();
+  }
+  g.fillStyle = PC.dim; g.font = "14px sans-serif";
+  g.fillText(xlabel || "x", (PLOT.x0 + PLOT.x1) / 2, PLOT.y1 + 44);
+  g.textAlign = "left";
+}
+// 密度曲線 x→px, density→py 的映射
+function densityMap(xmin, xmax, ymax) {
+  return {
+    X: (x) => PLOT.x0 + (x - xmin) / (xmax - xmin) * (PLOT.x1 - PLOT.x0),
+    Y: (d) => PLOT.y1 - d / ymax * (PLOT.y1 - PLOT.y0),
+    invX: (px) => xmin + (px - PLOT.x0) / (PLOT.x1 - PLOT.x0) * (xmax - xmin),
+    xmin, xmax, ymax,
+  };
+}
+function drawCurve(map, pdf, color) {
+  g.strokeStyle = color; g.lineWidth = 3; g.beginPath();
+  for (let px = PLOT.x0; px <= PLOT.x1; px += 2) {
+    const x = map.invX(px), py = map.Y(pdf(x));
+    px === PLOT.x0 ? g.moveTo(px, py) : g.lineTo(px, py);
+  }
+  g.stroke();
+}
+function fillUnder(map, pdf, a, b, color) {
+  g.fillStyle = color; g.beginPath();
+  const pa = map.X(a);
+  g.moveTo(pa, PLOT.y1);
+  for (let px = pa; px <= map.X(b); px += 2) g.lineTo(px, map.Y(pdf(map.invX(px))));
+  g.lineTo(map.X(b), PLOT.y1); g.closePath(); g.fill();
+}
+// 數值積分 P(a<X<b)
+function integ(pdf, a, b) {
+  let s = 0; const n = 240, h = (b - a) / n;
+  for (let k = 0; k < n; k++) s += pdf(a + (k + 0.5) * h) * h;
+  return s;
+}
+function pText(x, y, txt, color, size = 15, align = "left", bold = false) {
+  g.fillStyle = color; g.textAlign = align;
+  g.font = `${bold ? "bold " : ""}${size}px sans-serif`;
+  g.fillText(txt, x, y); g.textAlign = "left";
+}
+
+const PROB_LEVELS = [
+
+/* ─── P1:機率密度 = 麵粉撒桌 ─── */
+{
+  id: "P1", short: "機率密度", title: "關 1|機率密度:單點是 0,面積才是機率", ep: "P1", subj: "prob",
+  intro: `<p>連續變數(身高、等車時間)有個怪事:<b>「剛好等於某一個值」的機率是 0</b>——因為單一個點沒有寬度。有意義的問題是「落在<b>一段區間</b>裡」的機率,也就是密度曲線底下的<b>面積</b>。</p><p>拖動兩條門檻線 <span style="color:#38bdf8"><b>a</b></span>、<span style="color:#38bdf8"><b>b</b></span>,黃色面積就是 P(a &lt; X &lt; b)。把它框到 <b>0.5</b> 試試——那是「一半機率」的區間。</p>`,
+  formal: `<p class="math">連續型 X 的密度函數 f(x) ≥ 0 且 ∫f = 1。P(a&lt;X&lt;b)=∫ₐᵇ f(x)dx。任意單點 P(X=c)=∫_c^c f=0,故 P(a≤X≤b)=P(a&lt;X&lt;b)。</p>`,
+  goals: [{ id: "P1-half", text: "框出一段面積 ≈ 0.5 的區間(誤差 < 0.03)" }],
+  state: { a: -0.6, b: 0.6 },
+  pdf: (x) => gaussPDF(x, 0, 1.1),
+  enter() { this.state.a = -0.6; this.state.b = 0.6; },
+  map() { return densityMap(-4, 4, 0.40); },
+  demo() { const s = this.state; return [
+    { cap: "這條曲線是機率密度 f(x),整條底下面積 = 1", dur: 2400 },
+    { cap: "問「X 剛好 = 0」?寬度 0 的線,面積 0——機率是 0", dur: 2600 },
+    { num: [() => s.a, (v) => s.a = v, -1.1], dur: 100 },
+    { num: [() => s.b, (v) => s.b = v, 1.1], cap: "改問一段區間:黃色面積才是機率", dur: 2000 },
+    { num: [() => s.b, (v) => s.b = v, 0.7], cap: "區間越窄,面積(機率)越小", dur: 2000 },
+    { num: [() => s.a, (v) => s.a = v, -0.6], num2: [() => s.b, (v) => s.b = v, 0.6], cap: "換你:拖兩條線,框出剛好一半的機率", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state, m = this.map();
+    const mk = (key) => ({
+      getScreen: () => ({ x: m.X(s[key]), y: (PLOT.y0 + PLOT.y1) / 2 }),
+      setScreen: (px) => { s[key] = Math.max(-4, Math.min(4, m.invX(px))); },
+    });
+    return [mk("a"), mk("b")];
+  },
+  draw() {
+    const s = this.state, m = this.map(), pdf = this.pdf;
+    let a = Math.min(s.a, s.b), b = Math.max(s.a, s.b);
+    pAxes(-4, 4, m.ymax, "X(某個連續量,例如標準化身高)");
+    fillUnder(m, pdf, a, b, PC.fill);
+    drawCurve(m, pdf, PC.curve);
+    for (const [key, lbl] of [["a", "a"], ["b", "b"]]) {
+      const px = m.X(s[key]);
+      g.strokeStyle = PC.prior; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(px, PLOT.y0 - 6); g.lineTo(px, PLOT.y1); g.stroke();
+      g.fillStyle = PC.prior; g.beginPath(); g.arc(px, (PLOT.y0 + PLOT.y1) / 2, 8, 0, 7); g.fill();
+      pText(px, PLOT.y0 - 12, lbl, PC.prior, 16, "center", true);
+    }
+    const P = integ(pdf, a, b);
+    readout.innerHTML = `P(${fmt(a)} &lt; X &lt; ${fmt(b)}) = <b>${P.toFixed(3)}</b>${Math.abs(P - 0.5) < 0.03 ? "　<b style='color:#4ade80'>✓ 剛好一半!</b>" : ""}`;
+    if (Math.abs(P - 0.5) < 0.03) markGoal("P1-half");
+  },
+},
+
+/* ─── P2:正態分佈 μ、σ + 68-95-99.7 ─── */
+{
+  id: "P2", short: "正態分佈", title: "關 2|正態分佈:平均定位置,標準差定胖瘦", ep: "P2", subj: "prob",
+  intro: `<p>大自然的預設鐘形曲線由兩個數字決定:<b>μ(平均)</b>把整條曲線<b>左右平移</b>,<b>σ(標準差)</b>決定它<b>多胖多瘦</b>。</p><p>拖滑桿感受一下,並注意三塊陰影:不論 μ、σ 怎麼變,<b>±1σ 內永遠約 68%、±2σ 約 95%、±3σ 約 99.7%</b>——這就是有名的經驗法則。</p>`,
+  formal: `<p class="math">X~N(μ,σ²),f(x)=1/(σ√2π)·exp(−(x−μ)²/2σ²)。P(|X−μ|&lt;σ)≈0.6827、&lt;2σ≈0.9545、&lt;3σ≈0.9973,與 μ、σ 無關。</p>`,
+  goals: [
+    { id: "P2-narrow", text: "把 σ 調到 ≤ 0.6(尖瘦、集中)" },
+    { id: "P2-shift", text: "把 μ 平移到 ≥ 1.5(整條移位)" },
+  ],
+  state: { mu: 0, sig: 1 },
+  enter() { this.state.mu = 0; this.state.sig = 1; },
+  map() { return densityMap(-5, 5, 1.05); },
+  demo() { const s = this.state; return [
+    { cap: "標準鐘形:μ=0 在正中間,σ=1", dur: 2200 },
+    { num: [() => s.sig, (v) => s.sig = v, 0.5], cap: "σ 變小 → 又高又瘦,機率集中在中間", dur: 2200 },
+    { num: [() => s.sig, (v) => s.sig = v, 1.8], cap: "σ 變大 → 又矮又胖,散得更開", dur: 2200 },
+    { num: [() => s.sig, (v) => s.sig = v, 1], num2: [() => s.mu, (v) => s.mu = v, 2], cap: "μ 平移 → 整條曲線左右滑動,形狀不變", dur: 2200 },
+    { cap: "三塊陰影 68/95/99.7% 永遠不變——換你玩", dur: 2200 },
+    { num: [() => s.mu, (v) => s.mu = v, 0], dur: 1200 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `
+      <div class="row"><label>μ 平均</label><input type="range" id="pmu" min="-2.5" max="2.5" step="0.05" value="0"><span class="val" id="vmu">0</span></div>
+      <div class="row"><label>σ 標準差</label><input type="range" id="psig" min="0.4" max="2" step="0.05" value="1"><span class="val" id="vsig">1</span></div>`;
+    el.querySelector("#pmu").oninput = (e) => { s.mu = +e.target.value; el.querySelector("#vmu").textContent = fmt(s.mu); };
+    el.querySelector("#psig").oninput = (e) => { s.sig = +e.target.value; el.querySelector("#vsig").textContent = fmt(s.sig); };
+    this._sync = () => {
+      el.querySelector("#pmu").value = s.mu; el.querySelector("#vmu").textContent = fmt(s.mu);
+      el.querySelector("#psig").value = s.sig; el.querySelector("#vsig").textContent = fmt(s.sig);
+    };
+  },
+  draw() {
+    const s = this.state, m = densityMap(-5, 5, Math.max(0.42, gaussPDF(0, 0, s.sig)) * 1.15);
+    const pdf = (x) => gaussPDF(x, s.mu, s.sig);
+    pAxes(-5, 5, m.ymax, "X");
+    fillUnder(m, pdf, s.mu - 3 * s.sig, s.mu + 3 * s.sig, "rgba(56,189,248,.14)");
+    fillUnder(m, pdf, s.mu - 2 * s.sig, s.mu + 2 * s.sig, "rgba(56,189,248,.18)");
+    fillUnder(m, pdf, s.mu - s.sig, s.mu + s.sig, PC.fill);
+    drawCurve(m, pdf, PC.curve);
+    // μ 中線
+    g.strokeStyle = PC.post; g.lineWidth = 2; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(m.X(s.mu), PLOT.y0); g.lineTo(m.X(s.mu), PLOT.y1); g.stroke(); g.setLineDash([]);
+    pText(m.X(s.mu), PLOT.y0 - 10, "μ", PC.post, 16, "center", true);
+    pText(PLOT.x0 + 8, PLOT.y0 + 20, "±1σ ≈ 68%", PC.curve, 13);
+    pText(PLOT.x0 + 8, PLOT.y0 + 40, "±2σ ≈ 95%　±3σ ≈ 99.7%", PC.dim, 13);
+    readout.innerHTML = `μ = <b>${fmt(s.mu)}</b>　σ = <b>${fmt(s.sig)}</b>　±1σ 內機率 = ${(integ(pdf, s.mu - s.sig, s.mu + s.sig)).toFixed(3)}`;
+    if (s.sig <= 0.6) markGoal("P2-narrow");
+    if (s.mu >= 1.5) markGoal("P2-shift");
+  },
+},
+
+/* ─── P3:健檢偽陽性 = 自然頻率方格 ─── */
+{
+  id: "P3", short: "健檢陽性", title: "關 3|健檢陽性 ≠ 生病:自然頻率破解盲點", ep: "P3", subj: "prob",
+  intro: `<p>一個準確率 90% 的檢測,驗出陽性——你真的有病的機率是多少?直覺喊「90%」,但通常<b>遠低於此</b>。關鍵是<b>盛行率</b>:病本來就很罕見時,大量健康人貢獻的<b>偽陽性</b>會淹沒真陽性。</p><p>方塊代表 1000 人:左欄<span style="color:#ff5c7a">有病</span>、右欄<span style="color:#4ade80">健康</span>,亮起來的是<b>驗出陽性</b>的人。右邊 <b>PPV</b> = 陽性者裡真的有病的比例。拉動盛行率滑桿,看 PPV 怎麼崩。</p>`,
+  formal: `<p class="math">PPV = P(病|陽) = (prev·sens) / (prev·sens + (1−prev)·fpr)。sens=敏感度、fpr=偽陽性率。prev→0 時 PPV→0,與檢測本身多準無關。這是貝氏定理的頻率版。</p>`,
+  goals: [
+    { id: "P3-low", text: "把盛行率調到 1%,看 PPV 掉到多低" },
+    { id: "P3-high", text: "把盛行率調高到讓 PPV > 50%" },
+  ],
+  state: { prev: 0.1, sens: 0.9, fpr: 0.09 },
+  enter() { this.state.prev = 0.1; },
+  demo() { const s = this.state; return [
+    { cap: "1000 人:左欄有病、右欄健康,亮=驗出陽性", dur: 2400 },
+    { num: [() => s.prev, (v) => s.prev = v, 0.01], cap: "盛行率降到 1%:有病的人只剩一小條", dur: 2600 },
+    { cap: "問題來了:健康人雖只 9% 偽陽,但基數超大", dur: 2400 },
+    { cap: "結果陽性裡大多是「虛驚」——PPV 只有個位數 %", dur: 2600 },
+    { num: [() => s.prev, (v) => s.prev = v, 0.3], cap: "把病調成常見(30%):真陽性追上,PPV 才高", dur: 2400 },
+    { num: [() => s.prev, (v) => s.prev = v, 0.1], cap: "換你:先探 1%,再找出讓 PPV>50% 的盛行率", dur: 1600 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `
+      <div class="row"><label>盛行率</label><input type="range" id="pprev" min="0.005" max="0.5" step="0.005" value="0.1"><span class="val" id="vprev">10%</span></div>
+      <div class="row" style="font-size:.82rem;color:var(--dim)">敏感度固定 90%、偽陽性率固定 9%</div>`;
+    el.querySelector("#pprev").oninput = (e) => { s.prev = +e.target.value; el.querySelector("#vprev").textContent = (s.prev * 100).toFixed(1) + "%"; };
+    this._sync = () => { el.querySelector("#pprev").value = s.prev; el.querySelector("#vprev").textContent = (s.prev * 100).toFixed(1) + "%"; };
+  },
+  draw() {
+    const s = this.state;
+    const X0 = 90, Y0 = 90, W = 380, H = 440;
+    const sickW = W * s.prev;
+    const truePos = s.prev * s.sens, falsePos = (1 - s.prev) * s.fpr;
+    const ppv = truePos / (truePos + falsePos);
+    // 有病欄
+    g.fillStyle = "rgba(255,92,122,.18)"; g.fillRect(X0, Y0, sickW, H);
+    g.fillStyle = PC.sick; g.fillRect(X0, Y0, sickW, H * s.sens); // 真陽性(上段亮)
+    // 健康欄
+    g.fillStyle = "rgba(74,222,128,.15)"; g.fillRect(X0 + sickW, Y0, W - sickW, H);
+    g.fillStyle = PC.pos; g.fillRect(X0 + sickW, Y0, W - sickW, H * s.fpr); // 偽陽性(上段亮)
+    g.strokeStyle = "#0a0e1a"; g.lineWidth = 2; g.strokeRect(X0, Y0, sickW, H); g.strokeRect(X0 + sickW, Y0, W - sickW, H);
+    pText(X0 + sickW / 2, Y0 - 12, "有病", PC.sick, 13, "center", true);
+    pText(X0 + sickW + (W - sickW) / 2, Y0 - 12, "健康", PC.well, 13, "center", true);
+    pText(X0, Y0 + H + 22, `盛行率 ${(s.prev * 100).toFixed(1)}% · 亮色 = 檢測陽性`, PC.dim, 13);
+    // 右側 PPV 讀數條
+    const bx = X0 + W + 40, bw = 46, bh = H;
+    g.fillStyle = "#1d2440"; g.fillRect(bx, Y0, bw, bh);
+    g.fillStyle = PC.post; g.fillRect(bx, Y0 + bh * (1 - ppv), bw, bh * ppv);
+    g.strokeStyle = PC.axis; g.strokeRect(bx, Y0, bw, bh);
+    pText(bx + bw / 2, Y0 - 12, "PPV", PC.post, 13, "center", true);
+    pText(bx + bw / 2, Y0 + bh * (1 - ppv) - 8, (ppv * 100).toFixed(0) + "%", PC.post, 16, "center", true);
+    readout.innerHTML = `驗出陽性者中,真的有病 = <b>${(ppv * 100).toFixed(1)}%</b>　(每 1000 人:真陽 ${Math.round(truePos * 1000)}、偽陽 ${Math.round(falsePos * 1000)})`;
+    if (Math.abs(s.prev - 0.01) < 0.006) markGoal("P3-low");
+    if (ppv > 0.5) markGoal("P3-high");
+  },
+},
+
+/* ─── P4:貝氏定理 = 先驗→後驗 ─── */
+{
+  id: "P4", short: "貝氏更新", title: "關 4|貝氏定理:證據一筆筆改寫你的信念", ep: "P4", subj: "prob",
+  intro: `<p>貝氏定理是一台<b>信念更新機</b>:你帶著一個<b>先驗</b>機率進場,每看到一筆證據,就把它乘上證據的說服力,得到<b>後驗</b>——然後後驗變成下一輪的先驗,不斷疊加。</p><p>設好先驗(這個人患病的初始猜測),按「驗出陽性/陰性」餵證據,看藍色<span style="color:#38bdf8">信念條</span>怎麼跳。<b>連續幾次陽性</b>才會把信念推到高處——這正是醫生為何要複檢。</p>`,
+  formal: `<p class="math">後驗 P(H|E)=P(E|H)P(H) / [P(E|H)P(H)+P(E|¬H)P(¬H)]。本關 P(+|病)=0.9、P(+|健)=0.09。每筆證據把當前後驗當新先驗代入,即序貫貝氏更新。</p>`,
+  goals: [
+    { id: "P4-up", text: "從低先驗連按陽性,把後驗推到 > 90%" },
+    { id: "P4-down", text: "按一次陰性,看信念被拉回去" },
+  ],
+  state: { prior0: 0.1, p: 0.1, hist: [], sens: 0.9, fpr: 0.09 },
+  enter() { this.state.prior0 = 0.1; this.state.p = 0.1; this.state.hist = []; },
+  demo() { const s = this.state; return [
+    { call: () => { s.prior0 = 0.1; s.p = 0.1; s.hist = []; }, cap: "先驗:這個人有 10% 機率患病", dur: 2200 },
+    { call: () => { s.p = s.p * s.sens / (s.p * s.sens + (1 - s.p) * s.fpr); s.hist.push(1); }, cap: "驗出陽性一次 → 信念跳到約 53%", dur: 2400 },
+    { call: () => { s.p = s.p * s.sens / (s.p * s.sens + (1 - s.p) * s.fpr); s.hist.push(1); }, cap: "再一次陽性 → 約 92%,複檢的威力", dur: 2400 },
+    { call: () => { s.p = s.p * s.fpr / (s.p * s.fpr + (1 - s.p) * (1 - s.sens)); s.hist.push(0); }, cap: "但突然一次陰性 → 信念被大幅拉回", dur: 2600 },
+    { call: () => { s.prior0 = 0.1; s.p = 0.1; s.hist = []; }, cap: "換你:調先驗,連按陽性衝上 90%", dur: 1800 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `
+      <div class="row"><label>先驗</label><input type="range" id="pri" min="0.01" max="0.9" step="0.01" value="0.1"><span class="val" id="vpri">10%</span></div>
+      <div class="row">
+        <button class="primary" id="bpos">驗出陽性 +</button>
+        <button id="bneg">驗出陰性 −</button>
+        <button id="brst">重設</button>
+      </div>`;
+    const setPrior = (v) => { s.prior0 = v; if (!s.hist.length) s.p = v; el.querySelector("#vpri").textContent = (v * 100).toFixed(0) + "%"; };
+    el.querySelector("#pri").oninput = (e) => setPrior(+e.target.value);
+    el.querySelector("#bpos").onclick = () => { s.p = s.p * s.sens / (s.p * s.sens + (1 - s.p) * s.fpr); s.hist.push(1); };
+    el.querySelector("#bneg").onclick = () => { s.p = s.p * s.fpr / (s.p * s.fpr + (1 - s.p) * (1 - s.sens)); s.hist.push(0); };
+    el.querySelector("#brst").onclick = () => { s.p = s.prior0; s.hist = []; };
+    this._sync = () => { el.querySelector("#pri").value = s.prior0; el.querySelector("#vpri").textContent = (s.prior0 * 100).toFixed(0) + "%"; };
+  },
+  draw() {
+    const s = this.state;
+    const bx = 250, bw = 150, Y0 = 90, bh = 400;
+    // 信念條
+    g.fillStyle = "#1d2440"; g.fillRect(bx, Y0, bw, bh);
+    g.fillStyle = PC.prior; g.fillRect(bx, Y0 + bh * (1 - s.p), bw, bh * s.p);
+    g.strokeStyle = PC.axis; g.lineWidth = 1.5; g.strokeRect(bx, Y0, bw, bh);
+    // 90% 目標線
+    g.strokeStyle = "#4ade80"; g.setLineDash([6, 4]);
+    g.beginPath(); g.moveTo(bx - 10, Y0 + bh * 0.1); g.lineTo(bx + bw + 10, Y0 + bh * 0.1); g.stroke(); g.setLineDash([]);
+    pText(bx + bw + 16, Y0 + bh * 0.1 + 4, "90%", "#4ade80", 12);
+    const pyTop = Y0 + bh * (1 - s.p);
+    const labY = pyTop < Y0 + 30 ? pyTop + 26 : pyTop - 12; // 太高就把數字塞進條內
+    pText(bx + bw / 2, labY, (s.p * 100).toFixed(1) + "%", pyTop < Y0 + 30 ? "#0a0e1a" : PC.prior, 22, "center", true);
+    pText(bx + bw / 2, Y0 - 16, "當前信念(患病機率)", PC.dim, 13, "center");
+    // 證據歷史
+    let hx = bx, hy = Y0 + bh + 34;
+    pText(bx, hy - 18, `證據序列(${s.hist.length} 筆):`, PC.dim, 13);
+    s.hist.slice(-16).forEach((e, k) => {
+      g.fillStyle = e ? PC.pos : PC.well;
+      g.beginPath(); g.arc(hx + 14 + k * 22, hy + 6, 8, 0, 7); g.fill();
+      pText(hx + 14 + k * 22, hy + 11, e ? "+" : "−", "#0a0e1a", 13, "center", true);
+    });
+    readout.innerHTML = `後驗 = <b>${(s.p * 100).toFixed(1)}%</b>${s.p > 0.9 ? "　<b style='color:#4ade80'>✓ 信念已高</b>" : ""}`;
+    if (s.p > 0.9) markGoal("P4-up");
+    if (s.hist.length && s.hist[s.hist.length - 1] === 0 && s.hist.slice(0, -1).some((e) => e === 1)) markGoal("P4-down");
+  },
+},
+];
+
+/* ---------- 科目 ---------- */
+const SUBJECTS = {
+  la: { name: "線性代數", levels: LA_LEVELS },
+  prob: { name: "機率與統計", levels: PROB_LEVELS },
+};
+let curSubject = "la";
+
 /* ---------- UI 骨架 ---------- */
 const tabsEl = document.getElementById("tabs");
+const subjEl = document.getElementById("subjects");
+let levels = LA_LEVELS;
 let curIdx = 0;
 const cur = () => levels[curIdx];
 
 function levelDone(lv) { return lv.goals.every((gl) => progress[gl.id]); }
+
+function renderSubjects() {
+  subjEl.innerHTML = "";
+  for (const [key, sub] of Object.entries(SUBJECTS)) {
+    const b = document.createElement("button");
+    const done = sub.levels.filter(levelDone).length;
+    b.textContent = `${sub.name} (${done}/${sub.levels.length})`;
+    b.className = key === curSubject ? "active" : "";
+    b.onclick = () => switchSubject(key);
+    subjEl.appendChild(b);
+  }
+}
+
+function switchSubject(key) {
+  if (key === curSubject && levels === SUBJECTS[key].levels) return;
+  player.cancel();
+  curSubject = key;
+  levels = SUBJECTS[key].levels;
+  renderSubjects();
+  switchLevel(0);
+}
 
 function renderTabs() {
   tabsEl.innerHTML = "";
@@ -693,7 +1018,7 @@ function switchLevel(k) {
   lv._sync = null;
   lv.enter && lv.enter();
   lv.controls && lv.controls(ctl);
-  renderGoals(); renderTabs();
+  renderGoals(); renderTabs(); renderSubjects();
   // 第一次進入且尚未通關 → 自動播示範
   if (lv.demo && !demoSeen[lv.id] && !levelDone(lv)) {
     demoSeen[lv.id] = true;
@@ -714,5 +1039,6 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+renderSubjects();
 switchLevel(0);
 frame();
