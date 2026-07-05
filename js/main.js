@@ -273,6 +273,8 @@ const EP = {
   P5: ["概率EP02 隨機變數如何量化 ▶", "https://www.youtube.com/watch?v=QlKIuWLcdJ8"],
   P6: ["統計推論 大數法則 ▶", "https://www.youtube.com/watch?v=Zz_2gT2RHKU"],
   P7: ["統計推論 中心極限定理 ▶", "https://www.youtube.com/watch?v=Zz_2gT2RHKU"],
+  P8: ["概率EP01 機率的本質 ▶", "https://www.youtube.com/watch?v=DKx6p4__gkQ"],
+  P9: ["概率EP06 條件機率 ▶", "https://www.youtube.com/watch?v=tFUBBCfnjs8"],
 };
 const readout = document.getElementById("readout");
 
@@ -801,6 +803,133 @@ const LA_LEVELS = [
     if (sing) markGoal("L11-sing");
   },
 },
+
+/* ─── 關 12:零空間與行空間 ─── */
+{
+  id: "L12", short: "零空間", title: "關 12|塌陷之後:行空間與零空間", ep: 2,
+  intro: `<p>當矩陣把平面<b>壓扁</b>(行列式 = 0),兩件事同時發生:所有輸出擠進一條線——這條線叫<b>行空間</b>(值域,金色);同時有一整條線的向量全被送到<b>原點</b>——這條叫<b>零空間</b>(核,紫色)。</p><p>先拖 <span class="ih">î</span>、<span class="jh">ĵ</span> 讓行列式塌成 0(兩個基向量共線);再拖測試向量 <span class="hl">u</span>,找到那條讓 <b>A·u = 0</b> 的方向。維度守恆:行空間 + 零空間 = 2。</p>`,
+  formal: `<p class="math">行空間 = col(A) = span{欄向量};零空間 = null(A) = {u : Au = 0}。秩–零化度定理:rank(A) + nullity(A) = n。A 可逆 ⇔ null(A) = {0}。</p>`,
+  goals: [
+    { id: "L12-collapse", text: "把矩陣弄成奇異(det ≈ 0),平面塌成行空間" },
+    { id: "L12-null", text: "找到零空間:拖 u 讓 A·u = 0(u ≠ 0)" },
+  ],
+  state: { i: V(1.5, 0.5), j: V(0, 1), u: V(-1.5, 2) },
+  enter() { this.state.i = V(1.5, 0.5); this.state.j = V(0, 1); this.state.u = V(-1.5, 2); },
+  demo() { const s = this.state; return [
+    { cap: "目前 det ≠ 0,整個平面都填得滿", dur: 2000 },
+    { vec: [() => s.j, (w) => s.j = w, V(3, 1)], cap: "把 ĵ 拖到與 î 共線:平面塌成一條線=行空間", dur: 2400 },
+    { vec: [() => s.u, (w) => s.u = w, V(-1, 3)], cap: "沿某個方向的 u,被 A 壓成 0——這就是零空間", dur: 2600 },
+    { vec: [() => s.i, (w) => s.i = w, V(1.5, 0.5)], vec2: [() => s.j, (w) => s.j = w, V(0, 1)], cap: "換你:先塌陷,再獵零空間", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state;
+    return [
+      { get: () => s.i, set: (w) => { s.i = w; } },
+      { get: () => s.j, set: (w) => { s.j = w; } },
+      { get: () => s.u, set: (w) => { s.u = w; } },
+    ];
+  },
+  draw() {
+    const s = this.state, m = M(s.i, s.j), det = detM(m);
+    drawGrid(m);
+    const singular = Math.abs(det) < 0.06;
+    if (singular) {
+      // 行空間(金線,沿較長的欄向量)
+      const c = len(s.i) > len(s.j) ? s.i : s.j;
+      if (len(c) > 0.2) {
+        const dir = scl(c, 9 / len(c));
+        g.strokeStyle = COL.gold; g.lineWidth = 4; g.globalAlpha = 0.6;
+        let a = toScr(scl(dir, -1)), b = toScr(dir);
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); g.globalAlpha = 1;
+      }
+      // 零空間(紫虛線):n = (j.x, -i.x) 或 (j.y, -i.y)
+      let n = V(s.j.x, -s.i.x);
+      if (len(n) < 0.05) n = V(s.j.y, -s.i.y);
+      if (len(n) > 0.05) {
+        const dir = scl(n, 9 / len(n));
+        g.strokeStyle = COL.extra; g.lineWidth = 2; g.setLineDash([7, 5]);
+        let a = toScr(scl(dir, -1)), b = toScr(dir);
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); g.setLineDash([]);
+        labelAt(dir, "零空間", COL.extra, 6, -6);
+      }
+      if (len(s.i) > 0.3 || len(s.j) > 0.3) markGoal("L12-collapse");
+    }
+    const Au = applyM(m, s.u);
+    drawArrow(V(0, 0), s.i, COL.iHat, 3, "î");
+    drawArrow(V(0, 0), s.j, COL.jHat, 3, "ĵ");
+    drawArrow(V(0, 0), s.u, COL.vec, 3.5, "u");
+    if (len(Au) > 0.15) drawArrow(V(0, 0), Au, COL.blue, 3, "A·u");
+    else drawDot(V(0, 0), COL.blue, 8);
+    const nulled = len(Au) < 0.12 && len(s.u) > 0.8;
+    readout.innerHTML = `det = <b>${fmt(det)}</b>　秩 ${singular ? 1 : 2}　|A·u| = <b>${fmt(len(Au))}</b>${nulled ? "　<b style='color:#a78bfa'>u 在零空間!</b>" : ""}`;
+    if (nulled) markGoal("L12-null");
+  },
+},
+
+/* ─── 關 13:馬可夫鏈穩態(特徵向量的應用) ─── */
+{
+  id: "L13", short: "馬可夫穩態", title: "關 13|馬可夫鏈:一直走,忘掉起點", ep: 3,
+  intro: `<p>天氣在「晴 / 雨」間跳,轉移機率固定。從<b>任何</b>初始分布出發,一步步套用轉移矩陣,分布會<b>收斂到穩態</b>——而且跟你從哪開始無關。這個穩態,正是轉移矩陣<b>特徵值 = 1 的特徵向量</b>。</p><p>調兩個滑桿(留在晴、留在雨的機率),按「走一步」看分布爬向紅色穩態線。改轉移機率,穩態就跟著移動。</p>`,
+  formal: `<p class="math">轉移矩陣 T(各欄和為 1)。分布 xₜ₊₁ = T xₜ。穩態 π 滿足 Tπ = π(即 λ=1 的特徵向量)。2 態時 π_晴 = (1−b)/((1−a)+(1−b)),a、b 為留在原狀態的機率。</p>`,
+  goals: [
+    { id: "L13-converge", text: "連走 ≥ 15 步,看分布收斂到穩態" },
+    { id: "L13-extreme", text: "調轉移機率,讓穩態 π(晴) > 0.7 或 < 0.3" },
+  ],
+  state: { a: 0.8, b: 0.6, s: 0.05, hist: [0.05], steps: 0 },
+  enter() { this.state.a = 0.8; this.state.b = 0.6; this.state.s = 0.05; this.state.hist = [0.05]; this.state.steps = 0; },
+  pi() { const s = this.state; const den = (1 - s.a) + (1 - s.b); return den < 1e-6 ? 0.5 : (1 - s.b) / den; },
+  walk(k) { const s = this.state; for (let i = 0; i < k; i++) { s.s = s.a * s.s + (1 - s.b) * (1 - s.s); s.hist.push(s.s); s.steps++; } },
+  demo() { const self = this, s = this.state; return [
+    { call: () => self.enter(), cap: "從幾乎全雨(晴=5%)開始", dur: 1800 },
+    { call: () => self.walk(6), cap: "走幾步:晴天比例快速爬升", dur: 2200 },
+    { call: () => self.walk(14), cap: "20 步後,分布黏在紅色穩態線上,起點被遺忘", dur: 2600 },
+    { num: [() => s.b, (v) => s.b = v, 0.9], call: () => { s.s = self.state.hist[self.state.hist.length - 1]; }, cap: "改「留在雨」的機率,穩態整條移動", dur: 2400 },
+    { call: () => self.enter(), cap: "換你:走到收斂,再把穩態推到極端", dur: 1600 },
+  ]; },
+  controls(el) {
+    const self = this, s = this.state;
+    el.innerHTML = `
+      <div class="row"><label>留在晴</label><input type="range" id="ma" min="0.05" max="0.95" step="0.01" value="0.8"><span class="val" id="vma">0.80</span></div>
+      <div class="row"><label>留在雨</label><input type="range" id="mb" min="0.05" max="0.95" step="0.01" value="0.6"><span class="val" id="vmb">0.60</span></div>
+      <div class="row"><button class="primary" id="w1">走一步</button><button id="w10">走 10 步</button><button id="wr">重設</button></div>`;
+    el.querySelector("#ma").oninput = (e) => { s.a = +e.target.value; el.querySelector("#vma").textContent = s.a.toFixed(2); };
+    el.querySelector("#mb").oninput = (e) => { s.b = +e.target.value; el.querySelector("#vmb").textContent = s.b.toFixed(2); };
+    el.querySelector("#w1").onclick = () => self.walk(1);
+    el.querySelector("#w10").onclick = () => self.walk(10);
+    el.querySelector("#wr").onclick = () => { s.s = Math.random(); s.hist = [s.s]; s.steps = 0; };
+    this._sync = () => { el.querySelector("#ma").value = s.a; el.querySelector("#vma").textContent = s.a.toFixed(2); el.querySelector("#mb").value = s.b; el.querySelector("#vmb").textContent = s.b.toFixed(2); };
+  },
+  draw() {
+    const s = this.state, pi = this.pi();
+    // 當前分布條
+    const bx = 90, by = 70, bw = 180, bh = 60;
+    g.fillStyle = PC.curve; g.fillRect(bx, by, bw * s.s, bh);
+    g.fillStyle = PC.prior; g.fillRect(bx + bw * s.s, by, bw * (1 - s.s), bh);
+    g.strokeStyle = PC.axis; g.lineWidth = 1.5; g.strokeRect(bx, by, bw, bh);
+    pText(bx, by - 10, "當前分布", PC.dim, 13);
+    pText(bx + bw * s.s / 2, by + bh / 2 + 5, "晴", "#1a1a1a", 14, "center", true);
+    pText(bx + bw * s.s + bw * (1 - s.s) / 2, by + bh / 2 + 5, "雨", "#0a0e1a", 14, "center", true);
+    // 軌跡圖
+    const X0 = 90, Y0 = 180, W = 480, H = 340, Yb = Y0 + H;
+    const Y = (v) => Yb - v * H;
+    g.strokeStyle = PC.axis; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X0, Y0); g.lineTo(X0, Yb); g.lineTo(X0 + W, Yb); g.stroke();
+    pText(X0 - 8, Y(1) + 5, "1", PC.dim, 12, "right"); pText(X0 - 8, Yb + 5, "0", PC.dim, 12, "right");
+    // 穩態線
+    g.strokeStyle = PC.sick; g.setLineDash([6, 4]); g.lineWidth = 2;
+    g.beginPath(); g.moveTo(X0, Y(pi)); g.lineTo(X0 + W, Y(pi)); g.stroke(); g.setLineDash([]);
+    pText(X0 + W + 4, Y(pi) + 4, "π=" + pi.toFixed(2), PC.sick, 12);
+    // P(晴) 軌跡
+    const nn = Math.max(1, s.hist.length - 1);
+    g.strokeStyle = PC.curve; g.lineWidth = 2.5; g.beginPath();
+    s.hist.forEach((v, k) => { const px = X0 + (s.hist.length === 1 ? 0 : k / nn * W), py = Y(v); k ? g.lineTo(px, py) : g.moveTo(px, py); });
+    g.stroke();
+    s.hist.forEach((v, k) => { drawDisc(X0 + (s.hist.length === 1 ? 0 : k / nn * W), Y(v), 3, PC.curve, null); });
+    pText(X0, Y0 - 8, `P(晴) 隨步數的軌跡　已走 ${s.steps} 步`, PC.dim, 13);
+    readout.innerHTML = `P(晴) = <b>${s.s.toFixed(3)}</b>　穩態 π(晴) = <b>${pi.toFixed(3)}</b>${s.steps >= 15 && Math.abs(s.s - pi) < 0.02 ? "　<b style='color:#4ade80'>✓ 已收斂</b>" : ""}`;
+    if (s.steps >= 15 && Math.abs(s.s - pi) < 0.03) markGoal("L13-converge");
+    if (pi > 0.7 || pi < 0.3) markGoal("L13-extreme");
+  },
+},
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -866,6 +995,20 @@ function pText(x, y, txt, color, size = 15, align = "left", bold = false) {
   g.fillStyle = color; g.textAlign = align;
   g.font = `${bold ? "bold " : ""}${size}px sans-serif`;
   g.fillText(txt, x, y); g.textAlign = "left";
+}
+// 兩圓交集面積(lens);r1,r2 半徑,d 圓心距
+function lensArea(d, r1, r2) {
+  if (d >= r1 + r2) return 0;
+  if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
+  const a1 = r1 * r1 * Math.acos((d * d + r1 * r1 - r2 * r2) / (2 * d * r1));
+  const a2 = r2 * r2 * Math.acos((d * d + r2 * r2 - r1 * r1) / (2 * d * r2));
+  const a3 = 0.5 * Math.sqrt((-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2));
+  return a1 + a2 - a3;
+}
+function drawDisc(cx, cy, r, fill, stroke, lw = 2) {
+  g.beginPath(); g.arc(cx, cy, r, 0, 7);
+  if (fill) { g.fillStyle = fill; g.fill(); }
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); }
 }
 
 const PROB_LEVELS = [
@@ -1265,6 +1408,122 @@ const PROB_LEVELS = [
     readout.innerHTML = `N = <b>${N}</b>　和的平均 ${mu.toFixed(1)}、標準差 ${sig.toFixed(2)}${N === 1 ? "　(平坦=均勻)" : N >= 8 ? "　<b style='color:#4ade80'>✓ 鐘形</b>" : ""}`;
     if (N === 1) markGoal("P7-flat");
     if (N >= 8) markGoal("P7-bell");
+  },
+},
+
+/* ─── P8:樣本空間與加法法則 ─── */
+{
+  id: "P8", short: "樣本空間", title: "關 8|樣本空間:機率就是「面積佔比」", ep: "P8", subj: "prob",
+  intro: `<p>把所有可能結果想成一個<b>方框</b>(樣本空間),事件就是框裡的<b>區域</b>,機率 = 區域面積 ÷ 整框面積。拖動兩個圓 <span style="color:#fbbf24"><b>A</b></span>、<span style="color:#38bdf8"><b>B</b></span>。</p><p>把它們<b>拉開不重疊</b>,P(A∪B) = P(A)+P(B);讓它們<b>重疊</b>,就得扣掉算了兩次的交集:<b>P(A∪B) = P(A)+P(B)−P(A∩B)</b>。這就是加法法則(排容原理)。</p>`,
+  formal: `<p class="math">機率公理:P(Ω)=1、P(A)≥0、互斥事件可加。加法法則 P(A∪B)=P(A)+P(B)−P(A∩B);互斥(A∩B=∅)時退化為 P(A)+P(B)。</p>`,
+  goals: [
+    { id: "P8-disjoint", text: "把 A、B 拉到完全不重疊(互斥)" },
+    { id: "P8-overlap", text: "讓 A、B 明顯重疊,看聯集要扣掉交集" },
+  ],
+  state: { ax: 0.34, ay: 0.5, bx: 0.64, by: 0.5, rA: 0.19, rB: 0.22 },
+  enter() { Object.assign(this.state, { ax: 0.34, ay: 0.5, bx: 0.64, by: 0.5 }); },
+  box() { return { X: 130, Y: 90, S: 420 }; }, // 樣本空間方框(螢幕)
+  demo() { const s = this.state; return [
+    { cap: "方框 = 樣本空間,兩個圓是事件 A、B", dur: 2200 },
+    { num: [() => s.ax, (v) => s.ax = v, 0.28], num2: [() => s.bx, (v) => s.bx = v, 0.72], cap: "拉開不重疊:P(A∪B) 剛好 = P(A)+P(B)", dur: 2400 },
+    { num: [() => s.ax, (v) => s.ax = v, 0.42], num2: [() => s.bx, (v) => s.bx = v, 0.58], cap: "推到重疊:交集被算了兩次,要扣掉", dur: 2400 },
+    { num: [() => s.ax, (v) => s.ax = v, 0.34], num2: [() => s.bx, (v) => s.bx = v, 0.64], cap: "換你:各做出一次互斥和重疊", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state, bx = this.box();
+    const mk = (kx, ky, r) => ({
+      getScreen: () => ({ x: bx.X + s[kx] * bx.S, y: bx.Y + s[ky] * bx.S }),
+      setScreen: (px, py) => {
+        s[kx] = Math.max(r, Math.min(1 - r, (px - bx.X) / bx.S));
+        s[ky] = Math.max(r, Math.min(1 - r, (py - bx.Y) / bx.S));
+      },
+    });
+    return [mk("ax", "ay", s.rA), mk("bx", "by", s.rB)];
+  },
+  draw() {
+    const s = this.state, B = this.box();
+    g.fillStyle = "#0f1424"; g.fillRect(B.X, B.Y, B.S, B.S);
+    g.strokeStyle = PC.axis; g.lineWidth = 2; g.strokeRect(B.X, B.Y, B.S, B.S);
+    pText(B.X, B.Y - 10, "Ω 樣本空間(面積 = 1)", PC.dim, 13);
+    const Ax = B.X + s.ax * B.S, Ay = B.Y + s.ay * B.S, rA = s.rA * B.S;
+    const Bx = B.X + s.bx * B.S, By = B.Y + s.by * B.S, rB = s.rB * B.S;
+    drawDisc(Ax, Ay, rA, "rgba(255,209,102,.32)", PC.curve, 2);
+    drawDisc(Bx, By, rB, "rgba(56,189,248,.30)", PC.prior, 2);
+    pText(Ax, Ay + 5, "A", PC.curve, 18, "center", true);
+    pText(Bx, By + 5, "B", PC.prior, 18, "center", true);
+    const PA = Math.PI * s.rA ** 2, PB = Math.PI * s.rB ** 2;
+    const d = Math.hypot(s.ax - s.bx, s.ay - s.by);
+    const inter = lensArea(d, s.rA, s.rB), uni = PA + PB - inter;
+    pText(B.X + B.S + 20, B.Y + 30, `P(A) = ${PA.toFixed(3)}`, PC.curve, 15);
+    pText(B.X + B.S + 20, B.Y + 58, `P(B) = ${PB.toFixed(3)}`, PC.prior, 15);
+    pText(B.X + B.S + 20, B.Y + 86, `P(A∩B) = ${inter.toFixed(3)}`, PC.post, 15);
+    pText(B.X + B.S + 20, B.Y + 118, `P(A∪B) = ${uni.toFixed(3)}`, PC.ink, 16, "left", true);
+    readout.innerHTML = `P(A)+P(B) = ${(PA + PB).toFixed(3)}　−　交集 ${inter.toFixed(3)}　=　<b>聯集 ${uni.toFixed(3)}</b>`;
+    if (d >= s.rA + s.rB) markGoal("P8-disjoint");
+    if (inter > 0.25 * Math.min(PA, PB)) markGoal("P8-overlap");
+  },
+},
+
+/* ─── P9:條件機率 = 把世界縮小到 B ─── */
+{
+  id: "P9", short: "條件機率", title: "關 9|條件機率:把世界縮小到 B 之內", ep: "P9", subj: "prob",
+  intro: `<p>P(A | B) 唸作「已知 B 發生,A 的機率」。做法就是:把整個世界<b>縮小到 B 這個圈</b>裡,再看 A 佔了多少——<b>P(A|B) = P(A∩B) / P(B)</b>。</p><p>藍圈 <span style="color:#38bdf8"><b>B</b></span> 固定當「新世界」,框外變暗。拖金圈 <span style="color:#fbbf24"><b>A</b></span>:把 A <b>整個塞進 B</b>,和把 A <b>完全移出 B</b>(此時 P(A|B)=0),感受條件如何改寫機率。這也是貝氏定理的地基。</p>`,
+  formal: `<p class="math">P(A|B) = P(A∩B)/P(B)(P(B)>0)。條件化 = 把樣本空間限制到 B 並重新歸一。獨立 ⇔ P(A|B)=P(A)。貝氏定理由此翻轉:P(B|A)=P(A|B)P(B)/P(A)。</p>`,
+  goals: [
+    { id: "P9-inside", text: "把 A 整個塞進 B 內(A ⊆ B)" },
+    { id: "P9-outside", text: "把 A 完全移出 B,讓 P(A|B) = 0" },
+  ],
+  state: { ax: 0.3, ay: 0.38, bx: 0.6, by: 0.56, rA: 0.15, rB: 0.3 },
+  enter() { this.state.ax = 0.3; this.state.ay = 0.38; },
+  box() { return { X: 130, Y: 90, S: 420 }; },
+  demo() { const s = this.state; return [
+    { cap: "藍圈 B 是「新世界」,框外變暗", dur: 2000 },
+    { num: [() => s.ax, (v) => s.ax = v, 0.6], num2: [() => s.ay, (v) => s.ay = v, 0.56], cap: "把 A 塞進 B 裡:A 的結果全落在新世界中", dur: 2400 },
+    { num: [() => s.ax, (v) => s.ax = v, 0.18], num2: [() => s.ay, (v) => s.ay = v, 0.2], cap: "把 A 移出 B:在 B 的世界裡 A 不可能,P(A|B)=0", dur: 2600 },
+    { num: [() => s.ax, (v) => s.ax = v, 0.3], num2: [() => s.ay, (v) => s.ay = v, 0.38], cap: "換你:各做一次「塞進去」和「移出來」", dur: 1600 },
+  ]; },
+  draggables() {
+    const s = this.state, bx = this.box();
+    return [{
+      getScreen: () => ({ x: bx.X + s.ax * bx.S, y: bx.Y + s.ay * bx.S }),
+      setScreen: (px, py) => {
+        s.ax = Math.max(s.rA, Math.min(1 - s.rA, (px - bx.X) / bx.S));
+        s.ay = Math.max(s.rA, Math.min(1 - s.rA, (py - bx.Y) / bx.S));
+      },
+    }];
+  },
+  draw() {
+    const s = this.state, B = this.box();
+    const Bx = B.X + s.bx * B.S, By = B.Y + s.by * B.S, rB = s.rB * B.S;
+    const Ax = B.X + s.ax * B.S, Ay = B.Y + s.ay * B.S, rA = s.rA * B.S;
+    // 暗底(B 外的世界被壓暗)
+    g.fillStyle = "#0b0e1a"; g.fillRect(B.X, B.Y, B.S, B.S);
+    g.strokeStyle = PC.axis; g.lineWidth = 2; g.strokeRect(B.X, B.Y, B.S, B.S);
+    // B = 新世界(較亮)
+    drawDisc(Bx, By, rB, "rgba(56,189,248,.20)", PC.prior, 2.5);
+    // A∩B 用剪裁高亮
+    g.save(); g.beginPath(); g.arc(Bx, By, rB, 0, 7); g.clip();
+    drawDisc(Ax, Ay, rA, "rgba(255,209,102,.55)", null);
+    g.restore();
+    drawDisc(Ax, Ay, rA, null, PC.curve, 2);
+    pText(Bx, By - rB - 8, "B(新世界)", PC.prior, 14, "center", true);
+    pText(Ax, Ay + 5, "A", PC.curve, 16, "center", true);
+    const PA = Math.PI * s.rA ** 2, PB = Math.PI * s.rB ** 2;
+    const d = Math.hypot(s.ax - s.bx, s.ay - s.by);
+    const inter = lensArea(d, s.rA, s.rB), cond = PB > 1e-9 ? inter / PB : 0;
+    // P(A|B) 大數字 + 條
+    const rx = B.X + B.S + 20, ry = B.Y + 40, rw = 120, rh = 260;
+    pText(rx, ry - 14, "P(A|B)", PC.ink, 15, "left", true);
+    g.fillStyle = "#1d2440"; g.fillRect(rx, ry, 40, rh);
+    g.fillStyle = PC.curve; g.fillRect(rx, ry + rh * (1 - cond), 40, rh * cond);
+    g.strokeStyle = PC.axis; g.strokeRect(rx, ry, 40, rh);
+    pText(rx + 52, ry + rh / 2, (cond * 100).toFixed(0) + "%", PC.curve, 26, "left", true);
+    pText(rx, ry + rh + 24, `= P(A∩B)/P(B)`, PC.dim, 13);
+    pText(rx, ry + rh + 44, `= ${inter.toFixed(3)}/${PB.toFixed(3)}`, PC.dim, 13);
+    const inside = d + s.rA <= s.rB + 0.005, outside = d >= s.rA + s.rB;
+    readout.innerHTML = `P(A|B) = <b>${(cond * 100).toFixed(1)}%</b>${inside ? "　<b style='color:#4ade80'>A ⊆ B</b>" : outside ? "　<b style='color:#4ade80'>P(A|B)=0</b>" : ""}`;
+    if (inside) markGoal("P9-inside");
+    if (outside) markGoal("P9-outside");
   },
 },
 ];
