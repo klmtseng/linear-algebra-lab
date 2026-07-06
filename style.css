@@ -35,12 +35,15 @@ body.light {
 body.light #board { background: #f4f6fc; }
 body.light #caption, body.light #cert { background: rgba(255,255,255,.94); }
 header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); position: relative; }
-#theme-btn {
-  position: absolute; top: 18px; right: 22px;
+#theme-btn, #voice-btn {
+  position: absolute; top: 18px;
   background: var(--panel2); border: 1px solid var(--line); color: var(--ink);
   width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 1.1rem;
 }
-#theme-btn:hover { border-color: var(--accent); }
+#theme-btn { right: 22px; }
+#voice-btn { right: 68px; }
+#voice-btn.on { border-color: var(--accent); background: var(--accent); }
+#theme-btn:hover, #voice-btn:hover { border-color: var(--accent); }
 #overall { color: var(--accent); margin-left: 12px; font-variant-numeric: tabular-nums; }
 #cert {
   display: none;

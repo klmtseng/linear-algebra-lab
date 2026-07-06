@@ -17,6 +17,10 @@
 | 7 | 內積 = 投影,親手做出正交 | [EP3 特徵值與內積投影](https://www.youtube.com/watch?v=Ddw4H_pT_AM) |
 | 8 | 特徵向量獵人:找出不轉向的方向 | EP3 |
 
+## 旁白語音(選用)
+
+示範模式可開 🔊 旁白(預錄 mp3,Kokoro zf_xiaoxiao 中文女聲)。重生:`~/Desktop/AI_MAC/tools/kokoro-venv/bin/python tools/gen_narration.py`(需 misaki[zh])。字幕改了要重跑。
+
 ## 本機開發
 
 ```bash

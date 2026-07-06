@@ -70,3 +70,10 @@
 - 淺色課程主題:🌙/☀️ 切換,CSS var + 畫布顏色(TH/PC)雙層同步,localStorage 記住
 - 引擎:C2/C4 改用 x 軸 ▲ 握把(手機好抓,取代 curve 上小點)
 - 驗收(Chromium):微積分 4 關互動+goal、證書、主題切換全 PASS,零 error
+
+## 2026-07-06 M7:示範旁白語音(預錄,Kokoro 大陸腔)
+- 音色定案:Kokoro zf_xiaoxiao + misaki[zh] G2P(espeak 唸不了中文;使用者選大陸腔預錄,台灣腔 Kokoro 給不了)
+- 生成器 tools/gen_narration.py:讀 tools/captions.json(125句)→符號轉口語(say():σ→西格瑪、→→趨近/停頓、÷≤⊥ 等)→ audio/<id>_<i>.mp3(zf_xiaoxiao,80k,共 4MB);manifest=audio/narration.json
+- 播放:🔇/🔊 開關(header,localStorage 記住),示範逐句同步;單一 Audio 元素重用(iOS 友善);語音比字幕長會等唸完再跳(上限 dur+15s);瀏覽器擋自動播放→靜音續播(catch);按 ▶看示範/開關=使用者手勢解鎖
+- 驗收(Chromium):toggle 持久化、audio 請求正確、檔案 200、跳過停音、自動示範無手勢不報錯 全 PASS
+- 重生指令:kokoro-venv/bin/python tools/gen_narration.py [--force]

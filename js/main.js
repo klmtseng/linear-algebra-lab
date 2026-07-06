@@ -210,8 +210,14 @@ const demoBtnEl = document.getElementById("demo-btn");
 let demoSeen = {};
 try { demoSeen = JSON.parse(localStorage.getItem("lalab-demoseen") || "{}"); } catch (e) {}
 
+// 旁白語音(預錄 mp3,單一 Audio 元素重用對 iOS 較友善)
+let voiceOn = localStorage.getItem("lalab-voice") === "1";
+let voiceAudio = null;
+function getAudioEl() { if (!voiceAudio) voiceAudio = new Audio(); return voiceAudio; }
+function stopVoice() { if (voiceAudio) { voiceAudio.pause(); voiceAudio.onended = voiceAudio.onerror = null; } }
+
 const player = {
-  active: false, steps: [], idx: -1, t0: 0, dur: 0, apply: null, _hideT: 0,
+  active: false, steps: [], idx: -1, t0: 0, dur: 0, apply: null, _hideT: 0, clipWaiting: false,
   start(steps) {
     if (!steps || !steps.length) return;
     this.steps = steps; this.idx = -1; this.active = true;
@@ -249,16 +255,31 @@ const player = {
     if (st.call) st.call();
     this.apply = fns.length ? (t) => fns.forEach((f) => f(t)) : null;
     if (st.cap != null) { captionEl.textContent = st.cap; captionEl.classList.add("show"); }
+    this.playClip(st);
+  },
+  playClip(st) {
+    this.clipWaiting = false;
+    if (!voiceOn || st.cap == null) return;
+    const a = getAudioEl();
+    a.src = `audio/${cur().id}_${this.idx}.mp3`;
+    this.clipWaiting = true;
+    const done = () => { this.clipWaiting = false; };
+    a.onended = done; a.onerror = done;
+    try { a.currentTime = 0; } catch (e) {}
+    const pr = a.play();
+    if (pr && pr.catch) pr.catch(done); // 自動播放被擋(無使用者手勢)→ 靜音續播
   },
   update() {
     if (!this.active) return;
     const t = Math.min(1, (performance.now() - this.t0) / this.dur);
     this.apply && this.apply(ease(t));
     cur()._sync && cur()._sync();
-    if (t >= 1) this.next();
+    // 動畫跑完後,若語音還沒唸完就等它(上限 dur+15s 防卡)
+    if (t >= 1 && (!this.clipWaiting || performance.now() - this.t0 > this.dur + 15000)) this.next();
   },
   cancel() {
-    this.active = false; this.apply = null;
+    this.active = false; this.apply = null; this.clipWaiting = false;
+    stopVoice();
     clearTimeout(this._hideT);
     captionEl.classList.remove("show");
     demoBtnEl.textContent = "▶ 看示範";
@@ -1931,6 +1952,18 @@ themeBtn.textContent = themeName === "light" ? "☀️" : "🌙";
 themeBtn.onclick = () => {
   applyTheme(themeName === "light" ? "dark" : "light");
   themeBtn.textContent = themeName === "light" ? "☀️" : "🌙";
+};
+
+// 旁白語音開關
+const voiceBtn = document.getElementById("voice-btn");
+function syncVoiceBtn() { voiceBtn.textContent = voiceOn ? "🔊" : "🔇"; voiceBtn.classList.toggle("on", voiceOn); }
+syncVoiceBtn();
+voiceBtn.onclick = () => {
+  voiceOn = !voiceOn;
+  localStorage.setItem("lalab-voice", voiceOn ? "1" : "0");
+  syncVoiceBtn();
+  if (!voiceOn) { stopVoice(); player.clipWaiting = false; }
+  else { getAudioEl(); if (player.active) player.playClip(player.steps[player.idx]); } // 開啟時解鎖音訊+補播當前句
 };
 
 renderSubjects();
