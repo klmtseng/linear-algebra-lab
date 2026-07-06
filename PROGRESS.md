@@ -77,3 +77,9 @@
 - 播放:🔇/🔊 開關(header,localStorage 記住),示範逐句同步;單一 Audio 元素重用(iOS 友善);語音比字幕長會等唸完再跳(上限 dur+15s);瀏覽器擋自動播放→靜音續播(catch);按 ▶看示範/開關=使用者手勢解鎖
 - 驗收(Chromium):toggle 持久化、audio 請求正確、檔案 200、跳過停音、自動示範無手勢不報錯 全 PASS
 - 重生指令:kokoro-venv/bin/python tools/gen_narration.py [--force]
+
+## 2026-07-07 M8:三科總測驗 + 對外準備(共 29 關)
+- makeQuiz 工廠:單選+Fisher-Yates 洗牌(reviewer 24萬次模擬驗證均勻)+逐題解釋+整卷重測;LQ 6題(過5)/PQ 6題(過5)/CQ 5題(過4);通過=該科目完成(證書條件)
+- **流程變更(使用者定案):validity-audit 移到管線中段**——測驗內容先過獨立審計才部署:17 題正解全對、引擎無 bug;修 3 個措辭漏洞(LQ4 λ<0 方向反轉改「留在原直線」、LQ5 加非零前提、CQ5 改問斜率封死「開始下降」歧義)
+- 對外配套:MIT LICENSE、og meta+og.png、footer 非官方聲明(與 JOHNSON-MATH 無隸屬)
+- 驗收:三科 tab 數 14/10/5、洗牌有效(首輪亂點 0/6)、學習後重測過關、goal/證書連動,零 error

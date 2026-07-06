@@ -316,6 +316,7 @@ const EP = {
   C2: ["微積分EP2 微分:瞬間斜率 ▶", "https://www.youtube.com/watch?v=VIVYtZPUGGM"],
   C3: ["微積分EP2 積分:總帳面積 ▶", "https://www.youtube.com/watch?v=VIVYtZPUGGM"],
   C4: ["微積分EP3 基本定理 ▶", "https://www.youtube.com/watch?v=vqzEcFxNN_U"],
+  Q: ["JOHNSON-MATH 頻道 ▶", "https://www.youtube.com/@JOHNSON-MATH"],
 };
 const readout = document.getElementById("readout");
 
@@ -1825,6 +1826,144 @@ const CALC_LEVELS = [
 },
 ];
 
+/* ═══════════════════════════════════════════════════════════
+   總測驗關 — 每科收尾,通過才算完成該科目(證書條件)
+   ═══════════════════════════════════════════════════════════ */
+function makeQuiz(id, name, pass, questions) {
+  return {
+    id, short: "總測驗", title: `總測驗|${name}:把 ${questions.length} 關串起來`, ep: "Q",
+    intro: `<p>不看畫布、不動滑桿——現在只考<b>觀念</b>。${questions.length} 題單選,答對 <b>${pass} 題以上</b>過關;每題答完都有解釋,答錯可以整卷重來。</p><p>這些題目全部來自你玩過的關卡。如果哪題卡住,回去把那關再玩一次,比背答案有用。</p>`,
+    formal: `<p class="math">通過標準:${pass}/${questions.length}。題目對應各關的核心不變量;選項每次重新洗牌,背位置沒有用。</p>`,
+    goals: [{ id: `${id}-pass`, text: `答對 ${pass}/${questions.length} 題以上,拿下本科目` }],
+    state: { i: 0, score: 0, results: [], done: false, answered: false },
+    enter() {
+      Object.assign(this.state, { i: 0, score: 0, results: [], done: false, answered: false });
+      this._render && this._render();
+    },
+    controls(el) {
+      const s = this.state, lv = this;
+      const render = () => {
+        if (s.done) {
+          const passed = s.score >= pass;
+          el.innerHTML = `<div class="quiz-q">${passed ? "🎉 通過!" : "差一點,再來一輪!"}　得分 <b>${s.score}/${questions.length}</b></div>
+            <div class="row"><button class="primary" id="again">重新測驗</button></div>`;
+          el.querySelector("#again").onclick = () => lv.enter();
+          if (passed) markGoal(`${id}-pass`);
+          return;
+        }
+        const q = questions[s.i];
+        const opts = q.opts.map((text, k) => ({ text, ok: k === 0 }));
+        for (let k = opts.length - 1; k > 0; k--) { // 洗牌:正解不固定在同一格
+          const j = Math.floor(Math.random() * (k + 1));
+          [opts[k], opts[j]] = [opts[j], opts[k]];
+        }
+        el.innerHTML = `<div class="quiz-q"><b>第 ${s.i + 1}/${questions.length} 題</b>　${q.q}</div>` +
+          opts.map((o, k) => `<button class="quiz-opt" data-k="${k}">${o.text}</button>`).join("") +
+          `<div class="quiz-msg" id="qmsg"></div>
+           <div class="row"><button class="primary" id="nextq" style="display:none">${s.i + 1 === questions.length ? "看結果" : "下一題"}</button></div>`;
+        el.querySelectorAll(".quiz-opt").forEach((btn, k) => {
+          btn.onclick = () => {
+            if (s.answered) return;
+            s.answered = true;
+            const ok = opts[k].ok;
+            if (ok) s.score++;
+            s.results.push(ok);
+            btn.classList.add(ok ? "right" : "wrong");
+            el.querySelectorAll(".quiz-opt").forEach((b, j) => { if (opts[j].ok) b.classList.add("right"); });
+            el.querySelector("#qmsg").innerHTML = (ok ? "✓ " : "✗ ") + q.why;
+            el.querySelector("#nextq").style.display = "";
+          };
+        });
+        el.querySelector("#nextq").onclick = () => {
+          s.i++; s.answered = false;
+          if (s.i >= questions.length) s.done = true;
+          render();
+        };
+      };
+      this._render = render;
+      render();
+    },
+    draw() {
+      const s = this.state, n = questions.length;
+      const X0 = 120, Y = 300, gap = Math.min(70, 440 / n);
+      pText(340, 180, s.done ? (s.score >= pass ? "🏆" : "💪") : "📝", TH.text, 72, "center");
+      for (let k = 0; k < n; k++) {
+        const x = X0 + k * gap + gap / 2;
+        let fill = TH.gridFaint, label = "";
+        if (k < s.results.length) { fill = s.results[k] ? "#4ade80" : "#ff5c7a"; label = s.results[k] ? "✓" : "✗"; }
+        else if (k === s.i && !s.done) fill = "#ffd166";
+        drawDisc(x, Y, 16, fill, TH.axis, 1.5);
+        if (label) pText(x, Y + 6, label, "#0a0e1a", 16, "center", true);
+      }
+      pText(340, Y + 70, `${s.score} / ${n}　(通過線 ${pass})`, TH.dim, 18, "center");
+      readout.innerHTML = s.done
+        ? (s.score >= pass ? `<b style="color:#4ade80">通過!${name} 完成</b>` : `${s.score}/${n},通過線 ${pass}——再來一輪`)
+        : `第 ${s.i + 1} 題,目前 ${s.score} 分`;
+    },
+  };
+}
+
+/* 題庫:opts[0] 恆為正解(render 時洗牌) */
+LA_LEVELS.push(makeQuiz("LQ", "線性代數", 5, [
+  { q: "一個 2×2 矩陣的「第一個 column」是什麼?",
+    opts: ["î 被變換後的新位置", "矩陣的特徵向量", "x 軸的長度", "第一列元素的總和"],
+    why: "矩陣就是基向量的新家:第一行(column)= T(î),第二行 = T(ĵ)。(關 4)" },
+  { q: "det(A) = 0 代表這個變換怎麼了?",
+    opts: ["把平面壓扁進更低維度,不可逆", "只是旋轉,沒有變形", "面積放大了一倍", "A 一定是單位矩陣"],
+    why: "行列式 = 面積縮放率;0 = 塌陷、秩 < 2、資訊丟失不可逆。(關 5、12)" },
+  { q: "「先做剪切 S、再做旋轉 R」,合成矩陣是?",
+    opts: ["R·S", "S·R", "R + S", "S⁻¹·R"],
+    why: "先做的貼在右邊,矩陣乘法從右往左讀,跟 f(g(x)) 一樣。(關 6)" },
+  { q: "特徵向量是什麼樣的向量?",
+    opts: ["被變換打過去之後仍留在原本的直線上,只被縮放", "長度永遠不變的向量", "永遠指向 x 軸的向量", "行列式最大的方向"],
+    why: "A·u = λ·u:方向鎖在同一條線上、只伸縮(λ 為負時會反向),λ 就是特徵值。(關 8)" },
+  { q: "兩個非零向量 u、w 的內積 u·w = 0,幾何上代表?",
+    opts: ["u 和 w 互相垂直", "u 和 w 平行", "u 和 w 長度相等", "u 在 w 上的影子最長"],
+    why: "內積 = 影子長 × |w|;影子縮到 0 就是正交。(關 7)" },
+  { q: "把一個單位圓丟進任何 2×2 矩陣,出來的形狀是?",
+    opts: ["橢圓(可能退化成線段)", "永遠還是正圓", "正方形", "拋物線"],
+    why: "任何線性變換 = 轉→拉→轉(SVD),圓必變橢圓;σ₂=0 時塌成線段。(關 11)" },
+]));
+
+PROB_LEVELS.push(makeQuiz("PQ", "機率與統計", 5, [
+  { q: "連續隨機變數「剛好等於某個值」的機率是?",
+    opts: ["0——有意義的是一段區間的面積", "由該點的密度高度決定", "1 除以樣本數", "無法定義"],
+    why: "單點沒有寬度,積分為 0;機率 = 密度曲線下的面積。(關 1)" },
+  { q: "正態分佈在 μ±1σ 範圍內的機率大約是?",
+    opts: ["68%", "95%", "50%", "99.7%"],
+    why: "經驗法則 68–95–99.7,對任何 μ、σ 都成立。(關 2)" },
+  { q: "罕見病篩檢驗出陽性,真的有病的機率往往很低,主因是?",
+    opts: ["健康人基數太大,偽陽性淹沒了真陽性", "檢測的敏感度太低", "醫生判讀錯誤", "儀器沒有校準"],
+    why: "盛行率低時,就算偽陽率只有 9%,健康人的 9% 也遠多於病人的 90%。(關 3)" },
+  { q: "序貫貝氏更新中,這一輪算出的後驗,在下一輪扮演什麼?",
+    opts: ["先驗", "似然", "證據", "歸一化常數"],
+    why: "信念是滾動更新的:後驗 → 變成下一筆證據的先驗。(關 4)" },
+  { q: "大數法則:擲骰次數越多,累積平均會怎樣?",
+    opts: ["收斂到期望值 3.5,而且早期的大幅波動是正常的", "越擲越大", "慢慢歸零", "等於最後一次擲出的點數"],
+    why: "X̄ₙ → E[X],收斂速率約 1/√n,所以前幾十次亂跳不代表骰子有問題。(關 6)" },
+  { q: "中心極限定理:把很多個獨立隨機變數「加起來」,和的分布會趨向?",
+    opts: ["常態分佈——跟原本的分布長什麼樣無關", "均勻分佈", "跟原本的分布一模一樣", "指數分佈"],
+    why: "只要變異數有限,N 夠大時和就趨向鐘形——這是常態分佈無所不在的原因。(關 7)" },
+]));
+
+CALC_LEVELS.push(makeQuiz("CQ", "微積分", 4, [
+  { q: "sin(x)/x 在 x = 0 這一點?",
+    opts: ["沒有定義(0/0),但極限存在且等於 1", "就等於 1", "等於 0", "極限不存在"],
+    why: "x=0 是個洞;用 cos x ≤ sin x/x ≤ 1 夾擠,極限 = 1。(關 1)" },
+  { q: "導數 f′(x) 是「什麼東西」的極限?",
+    opts: ["割線斜率,當兩點間距 h → 0", "曲線下面積,當寬度 → 0", "函數值的平均", "切線的長度"],
+    why: "f′(x) = lim [f(x+h)−f(x)]/h:割線收成切線。(關 2)" },
+  { q: "黎曼和把長方形切到無限細,會收斂到?",
+    opts: ["定積分(曲線下的面積)", "導數", "0", "函數的最大值"],
+    why: "∫f = lim Σf(xᵢ)Δx,這就是積分的定義。(關 3)" },
+  { q: "微積分基本定理:累積面積函數 A(x) 的導數等於?",
+    opts: ["f(x) 本身", "永遠是 0", "A(x) 自己", "一個常數"],
+    why: "A′(x) = f(x):面積的變化率 = 當下的高度,微分積分是一體兩面。(關 4)" },
+  { q: "在 f(x) = 0 的那一點,累積面積 A(x) 的「斜率」是?",
+    opts: ["0(A 在該點走平)", "等於 A(x) 自己", "負無限大", "無法判斷"],
+    why: "A′(x) = f(x);f 是 0,A 的瞬時斜率就是 0——你在關 4 拖過那個點。(關 4)" },
+]));
+
 /* ---------- 科目 ---------- */
 const SUBJECTS = {
   la: { name: "線性代數", levels: LA_LEVELS },
@@ -1922,6 +2061,7 @@ function switchLevel(k) {
   const ctl = document.getElementById("lv-controls");
   ctl.innerHTML = "";
   lv._sync = null;
+  demoBtnEl.style.display = lv.demo ? "" : "none";
   lv.enter && lv.enter();
   lv.controls && lv.controls(ctl);
   renderGoals(); renderTabs(); renderSubjects(); renderOverall(); updateCert();

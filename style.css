@@ -151,6 +151,16 @@ details .math { font-family: "STIX Two Math", "Cambria Math", serif; }
 #lv-controls button.primary { background: var(--accent); color: #1a1a1a; font-weight: bold; }
 #lv-controls .val { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 3.4em; text-align: right; }
 #lv-controls .quiz-msg { font-size: .85rem; }
+.quiz-q { font-size: .95rem; line-height: 1.6; }
+button.quiz-opt {
+  display: block; width: 100%; text-align: left;
+  background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 12px; cursor: pointer; font-size: .9rem; font-family: inherit;
+}
+button.quiz-opt:hover { border-color: var(--accent); }
+button.quiz-opt.right { border-color: #4ade80; background: rgba(74,222,128,.14); }
+button.quiz-opt.wrong { border-color: #ff5c7a; background: rgba(255,92,122,.14); }
 .matrix-grid {
   display: grid; grid-template-columns: auto auto; gap: 6px;
   padding: 8px 14px; border-left: 2px solid var(--dim); border-right: 2px solid var(--dim);
