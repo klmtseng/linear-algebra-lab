@@ -623,7 +623,7 @@ const LA_LEVELS = [
   enter() { this.state.u = V(3, 1); this.state.w = V(1, 2); },
   demo() { const s = this.state; return [
     { cap: "藍色粗線 = u 在 w 方向上的影子(投影)", dur: 2400 },
-    { vec: [() => s.u, (w) => s.u = w, V(-1, 3)], cap: "轉動 u……影子越縮越短,內積跟著變小", dur: 2600 },
+    { vec: [() => s.u, (w) => s.u = w, V(1, 1)], cap: "轉動 u……影子越縮越短,內積跟著變小", dur: 2600 },
     { vec: [() => s.u, (w) => s.u = w, V(-2, 1)], cap: "影子縮到 0:內積 = 0,u ⊥ w", dur: 2000 },
     { dur: 1600 },
     { vec: [() => s.u, (w) => s.u = w, V(3, 1)], cap: "換你親手做出一次垂直!", dur: 1600 },
@@ -1252,7 +1252,7 @@ const PROB_LEVELS = [
     { call: () => { s.prior0 = 0.1; s.p = 0.1; s.hist = []; }, cap: "先驗:這個人有 10% 機率患病", dur: 2200 },
     { call: () => { s.p = s.p * s.sens / (s.p * s.sens + (1 - s.p) * s.fpr); s.hist.push(1); }, cap: "驗出陽性一次 → 信念跳到約 53%", dur: 2400 },
     { call: () => { s.p = s.p * s.sens / (s.p * s.sens + (1 - s.p) * s.fpr); s.hist.push(1); }, cap: "再一次陽性 → 約 92%,複檢的威力", dur: 2400 },
-    { call: () => { s.p = s.p * s.fpr / (s.p * s.fpr + (1 - s.p) * (1 - s.sens)); s.hist.push(0); }, cap: "但突然一次陰性 → 信念被大幅拉回", dur: 2600 },
+    { call: () => { s.p = s.p * (1 - s.sens) / (s.p * (1 - s.sens) + (1 - s.p) * (1 - s.fpr)); s.hist.push(0); }, cap: "但突然一次陰性 → 信念被大幅拉回", dur: 2600 },
     { call: () => { s.prior0 = 0.1; s.p = 0.1; s.hist = []; }, cap: "換你:調先驗,連按陽性衝上 90%", dur: 1800 },
   ]; },
   controls(el) {
@@ -1267,7 +1267,7 @@ const PROB_LEVELS = [
     const setPrior = (v) => { s.prior0 = v; if (!s.hist.length) s.p = v; el.querySelector("#vpri").textContent = (v * 100).toFixed(0) + "%"; };
     el.querySelector("#pri").oninput = (e) => setPrior(+e.target.value);
     el.querySelector("#bpos").onclick = () => { s.p = s.p * s.sens / (s.p * s.sens + (1 - s.p) * s.fpr); s.hist.push(1); };
-    el.querySelector("#bneg").onclick = () => { s.p = s.p * s.fpr / (s.p * s.fpr + (1 - s.p) * (1 - s.sens)); s.hist.push(0); };
+    el.querySelector("#bneg").onclick = () => { s.p = s.p * (1 - s.sens) / (s.p * (1 - s.sens) + (1 - s.p) * (1 - s.fpr)); s.hist.push(0); };
     el.querySelector("#brst").onclick = () => { s.p = s.prior0; s.hist = []; };
     this._sync = () => { el.querySelector("#pri").value = s.prior0; el.querySelector("#vpri").textContent = (s.prior0 * 100).toFixed(0) + "%"; };
   },
