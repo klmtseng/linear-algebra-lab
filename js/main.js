@@ -317,6 +317,7 @@ const EP = {
   C3: ["微積分EP2 積分:總帳面積 ▶", "https://www.youtube.com/watch?v=VIVYtZPUGGM"],
   C4: ["微積分EP3 基本定理 ▶", "https://www.youtube.com/watch?v=vqzEcFxNN_U"],
   Q: ["JOHNSON-MATH 頻道 ▶", "https://www.youtube.com/@JOHNSON-MATH"],
+  J: ["國中銜接系列(本站原創)", "https://github.com/klmtseng/linear-algebra-lab"],
 };
 const readout = document.getElementById("readout");
 
@@ -1827,13 +1828,392 @@ const CALC_LEVELS = [
 ];
 
 /* ═══════════════════════════════════════════════════════════
+   國中銜接模組 — 小六升國一(原創,無對應影片)
+   ═══════════════════════════════════════════════════════════ */
+const JH_LEVELS = [
+
+/* ─── J1:數線上的負數 ─── */
+{
+  id: "J1", short: "數線負數", title: "關 1|負數:在數線上走路", ep: "J", subj: "jh",
+  intro: `<p>國一第一個大魔王就是<b>負數</b>。祕訣只有一句:<b>加=往右走,減=往左走;遇到負號就轉身</b>。所以「加負 5」= 轉身往左走 5 步;「減負 6」= 轉兩次身,還是往右走 6 步。</p><p>把數線上的小圓點<b>拖到題目的答案位置</b>。用走路的方式在腦中算,不要背規則。</p>`,
+  formal: `<p class="math">a + (−b) = a − b;a − (−b) = a + b。數線模型:加法 = 向右位移,加負數 = 向左位移;減去一個數 = 加上它的相反數。</p>`,
+  goals: [
+    { id: "J1-a", text: "第 1 題:把點拖到 3 + (−5) 的位置" },
+    { id: "J1-b", text: "第 2 題:把點拖到 (−4) − (−6) 的位置" },
+  ],
+  state: { p: 0, task: 0 },
+  tasks: [{ expr: "3 + (−5)", ans: -2 }, { expr: "(−4) − (−6)", ans: 2 }],
+  enter() { this.state.p = 0; this.state.task = 0; },
+  nl() { const X = (v) => 60 + (v + 10) * 28; return { X, invX: (px) => (px - 60) / 28 - 10, Y: 360 }; },
+  demo() { const s = this.state; return [
+    { call: () => { s.task = 0; s.p = 3; }, cap: "從 3 出發。題目:三 加 負五", dur: 2000 },
+    { num: [() => s.p, (v) => s.p = v, -2], cap: "加負數=轉身往左,走 5 步,停在 負2", dur: 2600 },
+    { call: () => { s.task = 1; s.p = -4; }, cap: "換一題:負四 減 負六", dur: 2200 },
+    { num: [() => s.p, (v) => s.p = v, 2], cap: "減負數=轉兩次身,其實是往右走 6 步,停在 2", dur: 2600 },
+    { call: () => { s.task = 0; s.p = 0; }, cap: "換你走走看!", dur: 1400 },
+  ]; },
+  draggables() {
+    const s = this.state, m = this.nl();
+    return [{
+      getScreen: () => ({ x: m.X(s.p), y: m.Y }),
+      setScreen: (px) => { s.p = Math.max(-10, Math.min(10, Math.round(m.invX(px)))); },
+    }];
+  },
+  draw() {
+    const s = this.state, m = this.nl(), t = this.tasks[s.task];
+    // 數線
+    g.strokeStyle = TH.axis; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(m.X(-10), m.Y); g.lineTo(m.X(10), m.Y); g.stroke();
+    for (let k = -10; k <= 10; k++) {
+      const px = m.X(k), zero = k === 0;
+      g.strokeStyle = zero ? "#ffd166" : TH.axis; g.lineWidth = zero ? 2.5 : 1.5;
+      g.beginPath(); g.moveTo(px, m.Y - (zero ? 14 : 8)); g.lineTo(px, m.Y + (zero ? 14 : 8)); g.stroke();
+      if (k % 2 === 0) pText(px, m.Y + 34, String(k), k < 0 ? "#38bdf8" : TH.dim, 14, "center", zero);
+    }
+    pText(m.X(-8), m.Y - 60, "← 負的方向", "#38bdf8", 14, "center");
+    pText(m.X(8), m.Y - 60, "正的方向 →", "#4ade80", 14, "center");
+    // 題目
+    pText(340, 160, `題目:${t.expr} = ?`, TH.text, 30, "center", true);
+    // 小圓點角色
+    const px = m.X(Math.round(s.p * 10) / 10);
+    drawDisc(px, m.Y, 14, "#ffd166", "#0a0e1a", 2);
+    pText(px, m.Y + 6, "🚶", "#0a0e1a", 14, "center");
+    pText(px, m.Y - 26, `位置 ${Math.round(s.p)}`, "#ffd166", 15, "center", true);
+    const pr = Math.round(s.p);
+    readout.innerHTML = `第 ${s.task + 1}/2 題:<b>${t.expr}</b>　你在 <b>${pr}</b>`;
+    if (pr === t.ans) {
+      // 換題只在手指放開後,且不瞬移(從解對的位置繼續)
+      if (s.task === 0) { markGoal("J1-a"); if (progress["J1-a"] && !dragTarget && !player.active) s.task = 1; }
+      else markGoal("J1-b");
+    }
+  },
+},
+
+/* ─── J2:天平解方程式 ─── */
+{
+  id: "J2", short: "天平解方程", title: "關 2|未知數 x:用天平「解」出來", ep: "J", subj: "jh",
+  intro: `<p><b>x 不是神祕符號,它就是一個蓋著布的砝碼</b>。等式 = 一座平衡的天平。只要<b>兩邊做一樣的事</b>(各拿走一個、各加一個、各分一半),天平永遠平衡——這叫<b>等量公理</b>。</p><p>目標:把左邊清到<b>只剩 x</b>,右邊剩下的就是答案。</p>`,
+  formal: `<p class="math">等量公理:a = b ⇒ a±c = b±c、a·c = b·c、a/c = b/c(c≠0)。解方程 = 用等量公理把 x 孤立。</p>`,
+  goals: [
+    { id: "J2-a", text: "解出 x + 3 = 7" },
+    { id: "J2-b", text: "解出 2x = 6" },
+  ],
+  state: { q: 0, nx: 1, cL: 3, cR: 7, solved: false },
+  qs: [{ nx: 1, cL: 3, cR: 7, label: "x + 3 = 7" }, { nx: 2, cL: 0, cR: 6, label: "2x = 6" }],
+  loadQ(k) { const q = this.qs[k]; Object.assign(this.state, { q: k, nx: q.nx, cL: q.cL, cR: q.cR, solved: false }); },
+  enter() { this.loadQ(0); this._renderCtl && this._renderCtl(); },
+  demo() { const s = this.state, lv = this; const R = () => lv._renderCtl && lv._renderCtl(); return [
+    { call: () => { lv.loadQ(0); R(); }, cap: "x 加 3 顆砝碼 = 7 顆砝碼,天平是平的", dur: 2400 },
+    { call: () => { s.cL--; s.cR--; R(); }, cap: "兩邊各拿走一顆——還是平的", dur: 1800 },
+    { call: () => { s.cL--; s.cR--; R(); }, cap: "再拿走一顆", dur: 1400 },
+    { call: () => { s.cL--; s.cR--; R(); }, cap: "左邊只剩 x!右邊剩 4 顆:x = 4", dur: 2600 },
+    { call: () => { lv.loadQ(0); R(); }, cap: "換你來,之後還有第二題 2x = 6(提示:分一半)", dur: 2000 },
+  ]; },
+  controls(el) {
+    const s = this.state, lv = this;
+    const render = () => {
+      const solvedNow = s.nx === 1 && s.cL === 0;
+      el.innerHTML = `
+        <div class="row quiz-msg">目前:<b>${lv.qs[s.q].label}</b></div>
+        <div class="row">
+          <button id="take">兩邊各拿走 1</button>
+          <button id="add">兩邊各加 1</button>
+          <button id="half">兩邊各分一半</button>
+        </div>
+        <div class="row quiz-msg" id="jmsg">${solvedNow ? `<b style="color:#4ade80">x = ${s.cR}!</b>` : ""}</div>
+        <div class="row"><button class="primary" id="jnext" style="display:${solvedNow && s.q === 0 ? "" : "none"}">下一題:2x = 6</button></div>`;
+      const msg = (t) => { el.querySelector("#jmsg").innerHTML = t; };
+      el.querySelector("#take").onclick = () => {
+        if (s.cL > 0 && s.cR > 0) { s.cL--; s.cR--; render(); }
+        else msg("有一邊已經沒有砝碼可拿了");
+      };
+      el.querySelector("#add").onclick = () => { s.cL++; s.cR++; render(); };
+      el.querySelector("#half").onclick = () => {
+        if (s.nx % 2 === 0 && s.cL % 2 === 0 && s.cR % 2 === 0) { s.nx /= 2; s.cL /= 2; s.cR /= 2; render(); }
+        else msg("要兩邊都能公平分一半才行(全部都是偶數)");
+      };
+      el.querySelector("#jnext").onclick = () => { lv.loadQ(1); render(); };
+    };
+    this._renderCtl = render;
+    render();
+  },
+  draw() {
+    const s = this.state;
+    const cx = 340, beamY = 260, panY = 340;
+    // 支架與橫樑
+    g.strokeStyle = TH.axis; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(cx, beamY); g.lineTo(cx, beamY + 60); g.stroke();
+    g.beginPath(); g.moveTo(cx - 190, beamY); g.lineTo(cx + 190, beamY); g.stroke();
+    for (const side of [-1, 1]) {
+      const px = cx + side * 190;
+      g.strokeStyle = TH.axis; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(px, beamY); g.lineTo(px - 60, panY); g.moveTo(px, beamY); g.lineTo(px + 60, panY); g.stroke();
+      g.strokeStyle = TH.axis; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(px - 70, panY); g.lineTo(px + 70, panY); g.stroke();
+    }
+    // 左盤:x 箱 + 砝碼;右盤:砝碼
+    const drawItems = (px, nx, c) => {
+      let ix = px - 60, iy = panY - 26;
+      for (let k = 0; k < nx; k++) {
+        g.fillStyle = "#ffd166"; g.fillRect(ix, iy, 34, 24);
+        pText(ix + 17, iy + 17, "x", "#1a1a1a", 16, "center", true);
+        ix += 40; if (ix > px + 40) { ix = px - 60; iy -= 30; }
+      }
+      for (let k = 0; k < Math.min(c, 12); k++) {
+        drawDisc(ix + 12, iy + 12, 11, "#38bdf8", "#0a0e1a", 1.5);
+        ix += 28; if (ix > px + 52) { ix = px - 60; iy -= 28; }
+      }
+      if (c > 12) pText(px, iy - 14, `共 ${c} 顆`, "#38bdf8", 13, "center");
+    };
+    drawItems(cx - 190, s.nx, s.cL);
+    drawItems(cx + 190, 0, s.cR);
+    pText(cx - 190, panY + 28, "左", TH.dim, 14, "center");
+    pText(cx + 190, panY + 28, "右", TH.dim, 14, "center");
+    pText(cx, 150, this.qs[s.q].label, TH.text, 30, "center", true);
+    const solved = s.nx === 1 && s.cL === 0;
+    if (solved) {
+      pText(cx, 470, `x = ${s.cR}`, "#4ade80", 40, "center", true);
+      markGoal(s.q === 0 ? "J2-a" : "J2-b");
+    }
+    readout.innerHTML = `左邊:${s.nx} 個 x + ${s.cL} 顆砝碼　右邊:${s.cR} 顆砝碼${solved ? "　<b style='color:#4ade80'>解出來了!</b>" : ""}`;
+  },
+},
+
+/* ─── J3:座標平面尋寶 ─── */
+{
+  id: "J3", short: "座標尋寶", title: "關 3|座標 (x, y):兩個數字的尋寶指令", ep: "J", subj: "jh",
+  intro: `<p>座標就是一組<b>尋寶指令</b>,而且<b>順序固定</b>:第一個數字 x 管<b>左右</b>(正右負左),第二個 y 管<b>上下</b>(正上負下)。(3, −2) 唸作「右 3、下 2」。</p><p>把黃點拖到星星上。虛線會幫你把路拆成「先走 x、再走 y」兩段。</p>`,
+  formal: `<p class="math">直角座標系:平面上每點對應唯一有序數對 (x, y)。x > 0, y > 0 為第一象限,逆時針依序為二、三、四象限。</p>`,
+  goals: [
+    { id: "J3-a", text: "尋寶 1:把點送到 (3, −2)" },
+    { id: "J3-b", text: "尋寶 2:把點送到 (−4, 1)" },
+  ],
+  state: { pt: V(1, 1), stage: 0 },
+  targets: [V(3, -2), V(-4, 1)],
+  enter() { this.state.pt = V(1, 1); this.state.stage = 0; },
+  demo() { const s = this.state; return [
+    { call: () => { s.pt = V(0, 0); }, cap: "指令 (3, 負2):第一個數管左右,第二個管上下。從原點出發", dur: 2600 },
+    { vec: [() => s.pt, (w) => s.pt = w, V(3, 0)], cap: "先走 x:往右 3", dur: 1800 },
+    { vec: [() => s.pt, (w) => s.pt = w, V(3, -2)], cap: "再走 y:往下 2——到了!", dur: 2000 },
+    { vec: [() => s.pt, (w) => s.pt = w, V(1, 1)], cap: "換你尋寶。記住:先 x 再 y,順序不能換", dur: 1800 },
+  ]; },
+  draggables() {
+    const s = this.state;
+    return [{ get: () => s.pt, set: (w) => { s.pt = w; } }];
+  },
+  draw() {
+    const s = this.state, tgt = this.targets[s.stage];
+    drawGrid(MI(), { original: false });
+    pText(toScr(V(4.6, 0)).x, toScr(V(4.6, 0)).y - 8, "x", TH.dim, 15);
+    pText(toScr(V(0, 4.6)).x + 8, toScr(V(0, 4.6)).y, "y", TH.dim, 15);
+    drawStar(tgt, COL.star);
+    labelAt(tgt, `(${fmt(tgt.x)}, ${fmt(tgt.y)})`, COL.star, 14, -12);
+    drawDash(V(0, 0), V(s.pt.x, 0), "#38bdf8");
+    drawDash(V(s.pt.x, 0), s.pt, "#4ade80");
+    drawDot(s.pt, "#ffd166", 8);
+    readout.innerHTML = `尋寶 ${s.stage + 1}/2:目標 (${fmt(tgt.x)}, ${fmt(tgt.y)})　你在 (<b>${fmt(s.pt.x)}</b>, <b>${fmt(s.pt.y)}</b>)`;
+    if (Math.hypot(s.pt.x - tgt.x, s.pt.y - tgt.y) < 0.2) {
+      // 換目標只在手指放開後,且不瞬移
+      if (s.stage === 0) { markGoal("J3-a"); if (progress["J3-a"] && !dragTarget && !player.active) s.stage = 1; }
+      else markGoal("J3-b");
+    }
+  },
+},
+
+/* ─── J4:比與比例 ─── */
+{
+  id: "J4", short: "比與比例", title: "關 4|等比:放大縮小,形狀不變的祕密", ep: "J", subj: "jh",
+  intro: `<p>4:3 的照片放大成 8:6,看起來一模一樣;拉成 8:4 就變形了。<b>「比」相等 = 形狀相同</b>。</p><p>調寬和高,注意那條<b>對角線</b>:只要長方形的角落落在同一條對角線上,比就沒變——這就是等比的幾何長相。</p>`,
+  formal: `<p class="math">a:b = c:d ⇔ ad = bc(外項積=內項積)。等比的長方形,對角線的傾斜程度相同,所以角落都落在同一條線上。</p>`,
+  goals: [
+    { id: "J4-a", text: "做出 4:3 的等比放大版(寬 > 4)" },
+    { id: "J4-b", text: "做出比為 2:1 的長方形" },
+  ],
+  state: { w: 4, h: 3 },
+  enter() { this.state.w = 4; this.state.h = 3; },
+  demo() { const s = this.state; return [
+    { cap: "虛線是原本的 4:3。注意穿過角落的對角線", dur: 2400 },
+    // 單一縮放參數同步放大,補間全程保持 3w=4h(角落始終在線上)
+    { num: [() => s.w / 4, (t) => { s.w = 4 * t; s.h = 3 * t; }, 2], cap: "放大成 8:6——角落還在同一條線上,比沒變", dur: 2600 },
+    { num: [() => s.h, (v) => s.h = Math.round(v), 5], cap: "只把高改掉:角落離開對角線,變形了", dur: 2400 },
+    { num: [() => s.w, (v) => s.w = Math.round(v), 4], num2: [() => s.h, (v) => s.h = Math.round(v), 3], cap: "換你:先做等比放大,再做出 2 比 1", dur: 1800 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `
+      <div class="row"><label>寬</label><input type="range" id="jw" min="1" max="9" step="1" value="4"><span class="val" id="vjw">4</span></div>
+      <div class="row"><label>高</label><input type="range" id="jh" min="1" max="7" step="1" value="3"><span class="val" id="vjh">3</span></div>`;
+    el.querySelector("#jw").oninput = (e) => { s.w = +e.target.value; el.querySelector("#vjw").textContent = s.w; };
+    el.querySelector("#jh").oninput = (e) => { s.h = +e.target.value; el.querySelector("#vjh").textContent = s.h; };
+    this._sync = () => {
+      el.querySelector("#jw").value = s.w; el.querySelector("#vjw").textContent = fmt(s.w);
+      el.querySelector("#jh").value = s.h; el.querySelector("#vjh").textContent = fmt(s.h);
+    };
+  },
+  draw() {
+    const s = this.state;
+    const X0 = 110, Y0 = 560, SC = 52; // 原點左下
+    const same = 3 * s.w === 4 * s.h;
+    // 對角線(沿 4:3 方向延伸)
+    g.strokeStyle = same ? "#4ade80" : TH.demoAxis; g.lineWidth = 2; g.setLineDash([6, 5]);
+    g.beginPath(); g.moveTo(X0, Y0); g.lineTo(X0 + 9.6 * SC, Y0 - 7.2 * SC); g.stroke(); g.setLineDash([]);
+    // 參考 4:3(虛線)
+    g.strokeStyle = TH.axis; g.lineWidth = 1.5; g.setLineDash([4, 4]);
+    g.strokeRect(X0, Y0 - 3 * SC, 4 * SC, 3 * SC); g.setLineDash([]);
+    pText(X0 + 4 * SC - 6, Y0 - 3 * SC - 8, "4:3", TH.dim, 13, "right");
+    // 使用者長方形
+    g.fillStyle = same ? "rgba(74,222,128,.25)" : "rgba(56,189,248,.25)";
+    g.fillRect(X0, Y0 - s.h * SC, s.w * SC, s.h * SC);
+    g.strokeStyle = same ? "#4ade80" : "#38bdf8"; g.lineWidth = 2.5;
+    g.strokeRect(X0, Y0 - s.h * SC, s.w * SC, s.h * SC);
+    drawDisc(X0 + s.w * SC, Y0 - s.h * SC, 7, same ? "#4ade80" : "#ffd166", "#0a0e1a", 1.5);
+    // 約分(示範補間時 w,h 可能是小數,只在整數時約分)
+    const ints = Number.isInteger(s.w) && Number.isInteger(s.h);
+    const gcd = (a, b) => b ? gcd(b, a % b) : a, d = ints ? gcd(s.w, s.h) : 1;
+    pText(X0, Y0 + 30, `寬:高 = ${fmt(s.w)}:${fmt(s.h)}${d > 1 ? ` = ${s.w / d}:${s.h / d}` : ""}`, TH.text, 17, "left", true);
+    readout.innerHTML = `寬:高 = <b>${fmt(s.w)}:${fmt(s.h)}</b>${same ? "　<b style='color:#4ade80'>和 4:3 等比!角落在線上</b>" : s.w === 2 * s.h ? "　<b style='color:#4ade80'>2:1!</b>" : ""}`;
+    if (same && s.w > 4) markGoal("J4-a");
+    if (s.w === 2 * s.h) markGoal("J4-b");
+  },
+},
+
+/* ─── J5:質因數分解 ─── */
+{
+  id: "J5", short: "質因數分解", title: "關 5|質因數:把數字拆到不能再拆", ep: "J", subj: "jh",
+  intro: `<p>每個數都能拆成<b>質數</b>的乘積,而且<b>拆法只有一種</b>(順序不算)——這是算術基本定理,國一因倍數單元的地基。</p><p>用質數按鈕去「除」上面的數字:除得盡就拆下一顆質數,除不盡按了也沒用。把數字拆到剩 1,分解就完成了。</p>`,
+  formal: `<p class="math">算術基本定理:任何大於 1 的整數可唯一表示為質數的乘積(不計順序)。60 = 2²×3×5。</p>`,
+  goals: [
+    { id: "J5-a", text: "完整分解 60" },
+    { id: "J5-b", text: "完整分解 84" },
+  ],
+  state: { q: 0, remain: 60, factors: [] },
+  qs: [60, 84],
+  loadQ(k) { Object.assign(this.state, { q: k, remain: this.qs[k], factors: [] }); },
+  enter() { this.loadQ(0); this._renderCtl && this._renderCtl(); },
+  demo() { const s = this.state, lv = this; const R = () => lv._renderCtl && lv._renderCtl(); return [
+    { call: () => { lv.loadQ(0); R(); }, cap: "拆 60。先試最小的質數 2", dur: 2200 },
+    { call: () => { s.remain = 30; s.factors = [2]; R(); }, cap: "60 除以 2 = 30,拆下一顆 2", dur: 2000 },
+    { call: () => { s.remain = 15; s.factors = [2, 2]; R(); }, cap: "30 再除以 2 = 15。15 除不了 2,換 3", dur: 2200 },
+    { call: () => { s.remain = 5; s.factors = [2, 2, 3]; R(); }, cap: "15 除以 3 = 5,5 本身是質數", dur: 2000 },
+    { call: () => { s.remain = 1; s.factors = [2, 2, 3, 5]; R(); }, cap: "除到剩 1:60 = 2×2×3×5,收工", dur: 2600 },
+    { call: () => { lv.loadQ(0); R(); }, cap: "換你拆,拆完 60 還有 84", dur: 1600 },
+  ]; },
+  controls(el) {
+    const s = this.state, lv = this;
+    const render = () => {
+      const done = s.remain === 1;
+      el.innerHTML = `
+        <div class="row">${[2, 3, 5, 7].map((p) => `<button data-p="${p}">÷ ${p}</button>`).join("")}</div>
+        <div class="row quiz-msg" id="jmsg"></div>
+        <div class="row"><button class="primary" id="jnext" style="display:${done && s.q === 0 ? "" : "none"}">下一題:分解 84</button></div>`;
+      el.querySelectorAll("button[data-p]").forEach((btn) => {
+        btn.onclick = () => {
+          if (s.remain === 1) return;
+          const p = +btn.dataset.p;
+          if (s.remain % p === 0) { s.remain /= p; s.factors.push(p); render(); }
+          else el.querySelector("#jmsg").innerHTML = `${s.remain} 不能被 ${p} 整除,換一顆質數試試`;
+        };
+      });
+      el.querySelector("#jnext").onclick = () => { lv.loadQ(1); render(); };
+    };
+    this._renderCtl = render;
+    render();
+  },
+  draw() {
+    const s = this.state, N = this.qs[s.q];
+    pText(340, 140, `分解 ${N}`, TH.text, 30, "center", true);
+    // 分解鏈
+    let x = 120, y = 260;
+    const chain = [N]; let r = N;
+    for (const f of s.factors) { r /= f; chain.push(r); }
+    chain.forEach((v, k) => {
+      drawDisc(x, y, 26, v === 1 ? "#4ade80" : "#1d2440", v === 1 ? "#4ade80" : TH.axis, 2);
+      pText(x, y + 6, String(v), v === 1 ? "#0a0e1a" : TH.text, 16, "center", true);
+      if (k < s.factors.length) {
+        pText(x + 45, y - 10, `÷${s.factors[k]}`, "#ffd166", 14, "center", true);
+        g.strokeStyle = TH.axis; g.lineWidth = 1.5;
+        g.beginPath(); g.moveTo(x + 26, y); g.lineTo(x + 64, y); g.stroke();
+      }
+      x += 90; if (x > 580) { x = 120; y += 90; }
+    });
+    // 已拆下的質數 + 冪次式
+    const cnt = {};
+    s.factors.forEach((f) => cnt[f] = (cnt[f] || 0) + 1);
+    const sup = { 2: "²", 3: "³", 4: "⁴" };
+    const powStr = Object.keys(cnt).sort((a, b) => a - b).map((p) => cnt[p] > 1 ? `${p}${sup[cnt[p]] || "^" + cnt[p]}` : p).join(" × ");
+    if (s.factors.length) pText(340, 480, `${N} = ${s.factors.join(" × ")}${s.remain > 1 ? ` × ${s.remain}(還沒拆完)` : ""}`, TH.dim, 17, "center");
+    if (s.remain === 1) {
+      pText(340, 520, `${N} = ${powStr}`, "#4ade80", 24, "center", true);
+      markGoal(s.q === 0 ? "J5-a" : "J5-b");
+    }
+    readout.innerHTML = s.remain === 1 ? `<b style="color:#4ade80">分解完成:${N} = ${powStr}</b>` : `剩下 <b>${s.remain}</b> 還沒拆完`;
+  },
+},
+
+/* ─── J6:分數乘法面積模型 ─── */
+{
+  id: "J6", short: "分數乘法", title: "關 6|分數乘分數:就是「取一部分的一部分」", ep: "J", subj: "jh",
+  intro: `<p>「二分之一 乘 三分之二」到底在算什麼?就是<b>先取一半,再取那一半的三分之二</b>。用一塊正方形蛋糕看:橫向取幾格、縱向取幾格,<b>重疊的綠色區域就是答案</b>。</p><p>調兩個滑桿,看分子相乘、分母相乘為什麼是對的——因為格子總數是分母相乘,綠格數是分子相乘。</p>`,
+  formal: `<p class="math">(a/b)×(c/d) = ac/bd。面積模型:單位正方形切成 b×d 格,a 直條與 c 橫條重疊的部分共 ac 格。</p>`,
+  goals: [
+    { id: "J6-a", text: "做出 二分之一 × 三分之二(綠色 = 三分之一)" },
+    { id: "J6-b", text: "做出乘積剛好 = 四分之一 的另一種取法" },
+  ],
+  state: { a: 1, b: 1 },
+  enter() { this.state.a = 1; this.state.b = 1; },
+  demo() { const s = this.state; return [
+    { cap: "蛋糕切成 4 直條 × 3 橫條,共 12 格", dur: 2400 },
+    { num: [() => s.a, (v) => s.a = Math.round(v), 2], cap: "橫向取 4 條裡的 2 條——就是一半", dur: 2200 },
+    { num: [() => s.b, (v) => s.b = Math.round(v), 2], cap: "縱向再取 3 條裡的 2 條", dur: 2200 },
+    { cap: "綠色重疊 = 12 格裡的 4 格 = 三分之一。分子乘分子、分母乘分母的原因就在眼前", dur: 3000 },
+    { num: [() => s.a, (v) => s.a = Math.round(v), 1], num2: [() => s.b, (v) => s.b = Math.round(v), 1], cap: "換你切蛋糕!", dur: 1400 },
+  ]; },
+  controls(el) {
+    const s = this.state;
+    el.innerHTML = `
+      <div class="row"><label>橫向取</label><input type="range" id="ja" min="1" max="4" step="1" value="1"><span class="val" id="vja">1/4</span></div>
+      <div class="row"><label>縱向取</label><input type="range" id="jb" min="1" max="3" step="1" value="1"><span class="val" id="vjb">1/3</span></div>`;
+    el.querySelector("#ja").oninput = (e) => { s.a = +e.target.value; el.querySelector("#vja").textContent = s.a + "/4"; };
+    el.querySelector("#jb").oninput = (e) => { s.b = +e.target.value; el.querySelector("#vjb").textContent = s.b + "/3"; };
+    this._sync = () => {
+      el.querySelector("#ja").value = s.a; el.querySelector("#vja").textContent = s.a + "/4";
+      el.querySelector("#jb").value = s.b; el.querySelector("#vjb").textContent = s.b + "/3";
+    };
+  },
+  draw() {
+    const s = this.state;
+    const X0 = 150, Y0 = 120, W = 380, H = 380, cw = W / 4, ch = H / 3;
+    // 底格
+    g.fillStyle = TH.panel; g.fillRect(X0, Y0, W, H);
+    // 橫向取 a 直條(黃)
+    g.fillStyle = "rgba(255,209,102,.30)"; g.fillRect(X0, Y0, s.a * cw, H);
+    // 縱向取 b 橫條(藍)
+    g.fillStyle = "rgba(56,189,248,.30)"; g.fillRect(X0, Y0 + H - s.b * ch, W, s.b * ch);
+    // 交集(綠)
+    g.fillStyle = "rgba(74,222,128,.55)"; g.fillRect(X0, Y0 + H - s.b * ch, s.a * cw, s.b * ch);
+    // 格線
+    g.strokeStyle = TH.axis; g.lineWidth = 1.5;
+    for (let k = 0; k <= 4; k++) { g.beginPath(); g.moveTo(X0 + k * cw, Y0); g.lineTo(X0 + k * cw, Y0 + H); g.stroke(); }
+    for (let k = 0; k <= 3; k++) { g.beginPath(); g.moveTo(X0, Y0 + k * ch); g.lineTo(X0 + W, Y0 + k * ch); g.stroke(); }
+    pText(X0 + s.a * cw / 2, Y0 - 12, `${s.a}/4`, "#ffd166", 16, "center", true);
+    pText(X0 - 14, Y0 + H - s.b * ch / 2 + 5, `${s.b}/3`, "#38bdf8", 16, "right", true);
+    const num = s.a * s.b, gcd = (a, b) => b ? gcd(b, a % b) : a, d = gcd(num, 12);
+    pText(X0 + W / 2, Y0 + H + 36, `${s.a}/4 × ${s.b}/3 = ${num}/12${d > 1 ? ` = ${num / d}/${12 / d}` : ""}`, TH.text, 20, "center", true);
+    readout.innerHTML = `綠色 = <b>${num}</b> 格 / 12 格${num === 4 ? "　<b style='color:#4ade80'>= 1/3!</b>" : num === 3 ? "　<b style='color:#4ade80'>= 1/4!</b>" : ""}`;
+    if (s.a === 2 && s.b === 2) markGoal("J6-a");
+    if (num === 3) markGoal("J6-b");
+  },
+},
+];
+
+/* ═══════════════════════════════════════════════════════════
    總測驗關 — 每科收尾,通過才算完成該科目(證書條件)
    ═══════════════════════════════════════════════════════════ */
 function makeQuiz(id, name, pass, questions) {
   return {
     id, short: "總測驗", title: `總測驗|${name}:把 ${questions.length} 關串起來`, ep: "Q",
     intro: `<p>不看畫布、不動滑桿——現在只考<b>觀念</b>。${questions.length} 題單選,答對 <b>${pass} 題以上</b>過關;每題答完都有解釋,答錯可以整卷重來。</p><p>這些題目全部來自你玩過的關卡。如果哪題卡住,回去把那關再玩一次,比背答案有用。</p>`,
-    formal: `<p class="math">通過標準:${pass}/${questions.length}。題目對應各關的核心不變量;選項每次重新洗牌,背位置沒有用。</p>`,
+    formal: `<p class="math">通過標準:${pass}/${questions.length}。每題都對應某一關最重要的那個觀念;選項每次重新洗牌,背位置沒有用。</p>`,
     goals: [{ id: `${id}-pass`, text: `答對 ${pass}/${questions.length} 題以上,拿下本科目` }],
     state: { i: 0, score: 0, results: [], done: false, answered: false },
     enter() {
@@ -1964,11 +2344,33 @@ CALC_LEVELS.push(makeQuiz("CQ", "微積分", 4, [
     why: "A′(x) = f(x);f 是 0,A 的瞬時斜率就是 0——你在關 4 拖過那個點。(關 4)" },
 ]));
 
+JH_LEVELS.push(makeQuiz("JQ", "國中銜接", 5, [
+  { q: "3 + (−5) = ?",
+    opts: ["−2", "2", "−8", "8"],
+    why: "加負數 = 轉身往左走 5 步:從 3 走到 −2。(關 1)" },
+  { q: "天平兩邊各拿走 3 顆砝碼,原本平衡的等式會?",
+    opts: ["仍然成立——這就是等量公理", "左邊變重", "右邊變重", "從此無法判斷"],
+    why: "兩邊做一樣的事,平衡不會被打破;解方程式全靠這一條。(關 2)" },
+  { q: "點 (3, −2) 位在座標平面的哪裡?",
+    opts: ["第四象限(右下)", "第一象限(右上)", "第二象限(左上)", "第三象限(左下)"],
+    why: "x = 3 往右、y = −2 往下,落在右下的第四象限。(關 3)" },
+  { q: "一張 4:3 的照片等比放大後,寬變成 8,高應該是?",
+    opts: ["6", "7", "9", "12"],
+    why: "4:3 = 8:6;外項積 4×6 = 內項積 3×8,都是 24。(關 4)" },
+  { q: "60 的質因數分解是?",
+    opts: ["2×2×3×5", "2×3×10", "4×15", "2×2×2×3×5"],
+    why: "10、4、15 都不是質數還能再拆;2×2×2×3×5 = 120 不是 60。(關 5)" },
+  { q: "二分之一 × 三分之二 = ?",
+    opts: ["三分之一", "五分之二", "六分之一", "四分之三"],
+    why: "面積模型:12 格裡的綠色佔 4 格 = 1/3;分子乘分子、分母乘分母。(關 6)" },
+]));
+
 /* ---------- 科目 ---------- */
 const SUBJECTS = {
   la: { name: "線性代數", levels: LA_LEVELS },
   prob: { name: "機率與統計", levels: PROB_LEVELS },
   calc: { name: "微積分", levels: CALC_LEVELS },
+  jh: { name: "國中銜接", levels: JH_LEVELS },
 };
 let curSubject = "la";
 
