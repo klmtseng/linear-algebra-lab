@@ -1,5 +1,9 @@
 # 線代實驗室 LA Lab
 
+**Live: https://linear-algebra-lab-tau.vercel.app**
+
+![關卡畫面:向量其實是一張配方](docs/screenshot.png)
+
 用手拖出線性代數的幾何直覺。8 個互動關卡,配合 [JOHNSON-MATH](https://www.youtube.com/@JOHNSON-MATH) 《線性代數》EP1–EP3 服用。
 
 純前端、零依賴(Canvas 2D + vanilla JS),開 `index.html` 即用;進度存 localStorage。
